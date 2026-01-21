@@ -39,7 +39,6 @@ export async function importProject(
     const newAssetId = assetIdMap.get(asset.id)!;
     txs.push(
       db.tx.assets[newAssetId].update({
-        id: newAssetId,
         projectId,
         storageKey: asset.storageKey,
         url: asset.url,
@@ -68,7 +67,6 @@ export async function importProject(
     } else {
       txs.push(
         db.tx.cards[newCardId].update({
-          id: newCardId,
           projectId,
           caption: card.caption,
           assetId: remappedAssetId,
@@ -86,7 +84,6 @@ export async function importProject(
 
     txs.push(
       db.tx.choices[newChoiceId].update({
-        id: newChoiceId,
         cardId: remappedCardId,
         label: choice.label,
         targetCardId: remappedTargetCardId,

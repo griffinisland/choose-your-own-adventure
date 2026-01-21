@@ -17,7 +17,6 @@ export async function createProject(
   
   await db.transact([
     db.tx.projects[projectId].update({
-      id: projectId,
       ownerId,
       title,
       isPublished: true,
@@ -27,7 +26,6 @@ export async function createProject(
       updatedAt: now,
     }),
     db.tx.cards[cardId].update({
-      id: cardId,
       projectId,
       caption: 'Start',
       assetId: null,
@@ -109,7 +107,6 @@ export async function createCard(
   const cardId = id();
   await db.transact(
     db.tx.cards[cardId].update({
-      id: cardId,
       projectId,
       caption: 'New Card',
       assetId: null,
@@ -137,7 +134,7 @@ export async function deleteCard(cardId: string, projectId: string) {
   });
 
   const inboundChoices = data?.choices || [];
-  const tx = [
+  const tx: any[] = [
     ...inboundChoices.map((choice) =>
       db.tx.choices[choice.id].update({ targetCardId: null })
     ),
@@ -169,7 +166,6 @@ export async function createChoice(
   const choiceId = id();
   await db.transact(
     db.tx.choices[choiceId].update({
-      id: choiceId,
       cardId,
       label,
       targetCardId,
@@ -204,7 +200,6 @@ export async function createAsset(
   const assetId = id();
   await db.transact(
     db.tx.assets[assetId].update({
-      id: assetId,
       projectId,
       storageKey,
       url,

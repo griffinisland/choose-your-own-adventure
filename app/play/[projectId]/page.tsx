@@ -114,7 +114,7 @@ export default function PlayPage() {
       choices={choices.filter((ch) =>
         cards.some((c) => c.id === ch.cardId)
       ) as AppSchema['choices'][]}
-      startCardId={project.startCardId}
+      startCardId={project.startCardId ?? null}
       cardImages={cardImages}
     />
   );

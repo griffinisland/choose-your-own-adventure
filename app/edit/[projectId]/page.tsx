@@ -18,7 +18,7 @@ import {
   updateAsset,
   createCard,
 } from '@/lib/instantdb/mutations';
-import { CardList } from '@/components/editor/CardList';
+import { FlowCanvas } from '@/components/editor/FlowCanvas';
 import { Inspector } from '@/components/editor/Inspector';
 import { downloadProject } from '@/lib/importExport/exportProject';
 import { EditableTitle } from '@/components/EditableTitle';
@@ -231,13 +231,59 @@ export default function EditPage() {
   const handleAddCard = useCallback(async () => {
     try {
       const cardCount = (cards || []).length;
-      const newCardId = await createCard(projectId, 0, cardCount * 100);
+      // Position new card to the right of existing cards
+      // Calculate max X position and add 300px spacing
+      const maxX = cards && cards.length > 0
+        ? Math.max(...cards.map((c) => c.positionX))
+        : 0;
+      const newX = maxX + 300;
+      const newCardId = await createCard(projectId, newX, 0);
       setSelectedCardId(newCardId);
     } catch (error) {
       console.error('Failed to create card:', error);
       alert('Failed to create card. Please try again.');
     }
   }, [projectId, cards]);
+
+  const handleNodeDragStop = useCallback(
+    async (cardId: string, x: number, y: number) => {
+      await updateCard(cardId, { positionX: x, positionY: y });
+    },
+    []
+  );
+
+  const handleConnect = useCallback(
+    async (sourceCardId: string, targetCardId: string, choiceId?: string) => {
+      if (choiceId) {
+        // Connection from a choice node to a card
+        await updateChoice(choiceId, { targetCardId });
+      } else {
+        // Connection from card to card (fallback - create a new choice)
+        // Find the first choice without a target, or create a new one
+        const cardChoices = (choices || []).filter((c) => c.cardId === sourceCardId);
+        const emptyChoice = cardChoices.find((c) => !c.targetCardId);
+        
+        if (emptyChoice) {
+          await updateChoice(emptyChoice.id, { targetCardId });
+        } else {
+          // Create a new choice
+          const maxOrder = cardChoices.length > 0
+            ? Math.max(...cardChoices.map((c) => c.order))
+            : -1;
+          await createChoice(sourceCardId, 'New Choice', targetCardId, maxOrder + 1);
+        }
+      }
+    },
+    [choices, updateChoice, createChoice]
+  );
+
+  const handleDeleteEdge = useCallback(
+    async (choiceId: string) => {
+      // Break the connection by setting targetCardId to null
+      await updateChoice(choiceId, { targetCardId: null });
+    },
+    [updateChoice]
+  );
 
   if (!isLoading && project && !canEditProject(user, project.ownerId)) {
     return (
@@ -338,13 +384,17 @@ export default function EditPage() {
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Card List */}
-        <div className="flex-1 border-r border-gray-200">
-          <CardList
+        {/* Flow Canvas */}
+        <div className="flex-1 border-r border-gray-200 bg-gray-50">
+          <FlowCanvas
             cards={(cards || []) as AppSchema['cards'][]}
+            choices={(choices || []) as AppSchema['choices'][]}
             cardImages={cardImages}
+            onNodeDragStop={handleNodeDragStop}
+            onConnect={handleConnect}
+            onNodeClick={setSelectedCardId}
+            onDeleteEdge={handleDeleteEdge}
             selectedCardId={selectedCardId}
-            onCardSelect={setSelectedCardId}
           />
         </div>
 

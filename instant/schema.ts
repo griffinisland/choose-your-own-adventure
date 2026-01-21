@@ -1,5 +1,3 @@
-import type { Schema } from '@instantdb/react';
-
 type AppSchema = {
   projects: {
     id: string;
@@ -39,7 +37,8 @@ type AppSchema = {
 };
 
 export type { AppSchema };
-export const schema: Schema<AppSchema> = {
+// Runtime schema object (kept for backward compatibility); currently used for dev/docs, not for typechecking.
+export const schema = {
   projects: {
     rules: {},
   },
@@ -52,4 +51,4 @@ export const schema: Schema<AppSchema> = {
   assets: {
     rules: {},
   },
-};
+} as const;

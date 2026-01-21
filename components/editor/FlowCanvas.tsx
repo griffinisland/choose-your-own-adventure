@@ -12,6 +12,7 @@ import ReactFlow, {
   EdgeTypes,
   BackgroundVariant,
   useStore,
+  MarkerType,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { CardNode } from './CardNode';
@@ -196,7 +197,7 @@ export function FlowCanvas({
             strokeWidth: 2,
           },
           markerEnd: {
-            type: 'arrowclosed',
+            type: MarkerType.ArrowClosed,
             color: '#1083C0',
           },
           data: {
@@ -270,7 +271,7 @@ export function FlowCanvas({
         fitViewOptions={{ padding: 0.2 }}
         defaultEdgeOptions={{
           style: { stroke: '#1083C0', strokeWidth: 2 },
-          markerEnd: { type: 'arrowclosed', color: '#1083C0' },
+          markerEnd: { type: MarkerType.ArrowClosed, color: '#1083C0' },
         }}
       >
         <Background variant={BackgroundVariant.Dots} gap={12} size={1} />

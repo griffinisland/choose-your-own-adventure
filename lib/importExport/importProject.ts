@@ -111,7 +111,7 @@ export async function importProject(
     })
   );
 
-  await db.transact(...txs);
+  await db.transact(txs);
 
   return { projectId };
 }

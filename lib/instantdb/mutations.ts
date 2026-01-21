@@ -15,7 +15,7 @@ export async function createProject(
   const projectId = id();
   const cardId = id();
   
-  await db.transact(
+  await db.transact([
     db.tx.projects[projectId].update({
       id: projectId,
       ownerId,
@@ -33,8 +33,8 @@ export async function createProject(
       assetId: null,
       positionX: 250,
       positionY: 250,
-    })
-  );
+    }),
+  ]);
 
   return { projectId, cardId };
 }
@@ -71,7 +71,7 @@ export async function deleteProject(
   // Step 2: Delete choices (they reference cards)
   if (projectChoices.length > 0) {
     const choicesTx = projectChoices.map((choice) => db.tx.choices[choice.id].delete());
-    await db.transact(...choicesTx);
+    await db.transact(choicesTx);
   }
   
   // Step 3: Clear assetId from cards, then delete cards
@@ -82,19 +82,19 @@ export async function deleteProject(
     }
   });
   if (cardsTx.length > 0) {
-    await db.transact(...cardsTx);
+    await db.transact(cardsTx);
   }
   
   // Now delete the cards
   if (projectCards.length > 0) {
     const deleteCardsTx = projectCards.map((card) => db.tx.cards[card.id].delete());
-    await db.transact(...deleteCardsTx);
+    await db.transact(deleteCardsTx);
   }
   
   // Step 4: Delete assets
   if (projectAssets.length > 0) {
     const assetsTx = projectAssets.map((asset) => db.tx.assets[asset.id].delete());
-    await db.transact(...assetsTx);
+    await db.transact(assetsTx);
   }
   
   // Step 5: Finally delete the project
@@ -128,7 +128,7 @@ export async function updateCard(
 }
 
 export async function deleteCard(cardId: string, projectId: string) {
-  const { data } = await db.query({
+  const { data } = await db.queryOnce({
     choices: {
       $: {
         where: { targetCardId: cardId },
@@ -143,7 +143,7 @@ export async function deleteCard(cardId: string, projectId: string) {
     ),
   ];
 
-  const { data: outboundData } = await db.query({
+  const { data: outboundData } = await db.queryOnce({
     choices: {
       $: {
         where: { cardId },
@@ -157,7 +157,7 @@ export async function deleteCard(cardId: string, projectId: string) {
     db.tx.cards[cardId].delete()
   );
 
-  await db.transact(...tx);
+  await db.transact(tx);
 }
 
 export async function createChoice(

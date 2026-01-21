@@ -21593,3 +21593,389 @@ If you’d like, tell me the branch name and I can run the push for you.
 
 ---
 
+_**User (2026-01-21 00:37Z)**_
+
+I would like to completely replace the code that is currently on github with this updated version. so please push this to main:
+
+git@github.com:griffinisland/choose-your-own-adventure.git
+
+---
+
+_**Agent (model default, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+**Checking repo cleanliness before pushing**</details></think>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_cmd">
+<details><summary>Tool use: **run_terminal_cmd** • Run command: cd "/Users/gwaldau/Cursor projects/adventure builder" && git status --short</summary>
+
+```bash
+cd "/Users/gwaldau/Cursor projects/adventure builder" && git status --short
+```
+
+```
+ M .specstory/history/2026-01-09_21-03Z-hypercard-style-visual-novel-builder-mvp.md
+ M app/edit/[projectId]/page.tsx
+ M app/layout-client.tsx
+ M components/editor/CardNode.tsx
+ M components/editor/FlowCanvas.tsx
+?? components/MaterialIconsLoader.tsx
+?? components/editor/DeletableEdge.tsx
+
+```
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+**Confirming git push requirements**</details></think>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_cmd">
+<details><summary>Tool use: **run_terminal_cmd** • Run command: cd "/Users/gwaldau/Cursor projects/adventure builder" && git add .</summary>
+
+```bash
+cd "/Users/gwaldau/Cursor projects/adventure builder" && git add .
+```
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_cmd">
+<details><summary>Tool use: **run_terminal_cmd** • Run command: cd "/Users/gwaldau/Cursor projects/adventure builder" && git commit -m "Add drag ghost preview and deletable edges"</summary>
+
+```bash
+cd "/Users/gwaldau/Cursor projects/adventure builder" && git commit -m "Add drag ghost preview and deletable edges"
+```
+
+```
+[main 26203c6] Add drag ghost preview and deletable edges
+ 7 files changed, 13208 insertions(+), 13271 deletions(-)
+ create mode 100644 components/MaterialIconsLoader.tsx
+ create mode 100644 components/editor/DeletableEdge.tsx
+
+```
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+**Confirming push permissions**
+
+Noting that pushing to the origin requires both network and git_write permissions, so I'll set required permissions to include both.</details></think>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_cmd">
+<details><summary>Tool use: **run_terminal_cmd** • Run command: cd "/Users/gwaldau/Cursor projects/adventure builder" && git push origin main</summary>
+
+```bash
+cd "/Users/gwaldau/Cursor projects/adventure builder" && git push origin main
+```
+
+```
+Load key "/Users/gwaldau/.ssh/id_ed25519": Operation not permitted
+git@github.com: Permission denied (publickey).
+fatal: Could not read from remote repository.
+
+Please make sure you have the correct access rights
+and the repository exists.
+
+```
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+**Planning full rerun**</details></think>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_cmd">
+<details><summary>Tool use: **run_terminal_cmd** • Run command: cd "/Users/gwaldau/Cursor projects/adventure builder" && git push origin main</summary>
+
+```bash
+cd "/Users/gwaldau/Cursor projects/adventure builder" && git push origin main
+```
+
+```
+To github.com:griffinisland/choose-your-own-adventure.git
+   b88930e..26203c6  main -&gt; main
+
+```
+</details>
+</tool-use>
+
+---
+
+All set—your local changes have been pushed to `main` on `git@github.com:griffinisland/choose-your-own-adventure.git`.
+
+If you’d like, I can also tag this release or open a quick summary PR (even on main) for traceability.
+
+---
+
+_**User (2026-01-21 00:37Z)**_
+
+I am trying to deploy this app from our codebase on github to netlify but I got a deployment error with the following error summary. Can you analyze and help determine next steps?
+
+Relevant log lines: the TypeScript error about the edge marker is shown at lines 69–76 and the location of the failing statement is pointed at
+
+    line 183.
+    The build fails with a TypeScript type error in components/editor/FlowCanvas.tsx: an edge object uses markerEnd: { type: "arrowclosed"; color: ... } but the declared type for markerEnd (EdgeMarker/MarkerType from reactflow) does not accept the string "arrowclosed".
+
+Cause
+
+React Flow's MarkerType/EdgeMarker typing in the installed version does not include the literal "arrowclosed" (lowercase) — the expected value is a different identifier/casing (for example, a MarkerType enum or "arrowClosed"). Because of that mismatch, TypeScript rejects the edge object and the Next.js build fails.
+
+You can inspect the file here: https://github.com/griffinisland/choose-your-own-adventure/blob/main/components/editor/FlowCanvas.tsx
+
+Solution
+
+Fix the markerEnd to use the correct MarkerType (or the correctly-cased string) accepted by your installed reactflow types.
+
+Preferred fix — import MarkerType from reactflow and use its value:
+
+    In components/editor/FlowCanvas.tsx add the import (if not present):
+
+import { MarkerType } from 'reactflow';
+
+    Replace markerEnd objects like:
+
+markerEnd: { type: "arrowclosed", color: "#108..." }
+
+with:
+
+markerEnd: { type: MarkerType.ArrowClosed, color: "#108..." }
+
+(or, if you prefer literal string, use the correctly-cased value accepted by your reactflow version, e.g. "arrowClosed").
+
+Example snippet:
+
+// before
+const initialEdges: Edge[] = useMemo(
+  () => choices
+    .filter(choice => choice.targetCardId)
+    .map(choice => ({
+      id: ...,
+      source: ...,
+      target: ...,
+      animated: true,
+      style: { stroke: '#108...' },
+      markerEnd: { type: "arrowclosed", color: '#108...' } // <-- fails
+    })),
+  [choices]
+);
+
+// after
+import { MarkerType } from 'reactflow';
+
+const initialEdges: Edge[] = useMemo(
+  () => choices
+    .filter(choice => choice.targetCardId)
+    .map(choice => ({
+      id: ...,
+      source: ...,
+      target: ...,
+      animated: true,
+      style: { stroke: '#108...' },
+      markerEnd: { type: MarkerType.ArrowClosed, color: '#108...' } // <-- correct
+    })),
+  [choices]
+);
+
+Alternate quick fixes (if you want a faster workaround):
+
+    Cast the marker to any to bypass typing:
+
+markerEnd: { type: "arrowclosed", color: '#108...' } as any
+
+    Or cast the whole edge: as unknown as Edge
+
+These workarounds suppress the type error but prefer the proper typed fix above.
+
+If adjusting casing or using MarkerType does not resolve the error, check which reactflow version is installed and which marker names it exposes — update the marker usage to match that version (or update/downgrade reactflow to the version you expect). If you change the Node.js version for builds, see Netlify docs: https://docs.netlify.com/configure-builds/manage-dependencies/#node-js-and-javascript.
+
+---
+
+_**Agent (model gpt-5.2, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+**Analyzing build errors**
+
+I need to respond by analyzing the build error and figuring out how to implement a fix in the codebase. I'll start by using various tools to read the relevant files and check the React Flow version in package.json. Then, I’ll confirm the marker type and apply a patch to FlowCanvas to ensure it uses the MarkerType enum or correct casing. Checking other occurrences, like defaultEdgeOptions, is next. I'll run a grep for arrowclosed and then commit and push to main, ensuring everything is clean. I might need to provide next steps for the Netlify config as well.</details></think>
+
+---
+
+Plan: I’ll locate every `markerEnd` usage (and any other React Flow marker strings), check the installed `reactflow` version/types, then patch `FlowCanvas.tsx` to use the correct `MarkerType` constant so Netlify’s TypeScript build passes. After that I’ll commit and push to `main`, and give you the Netlify build settings to verify.
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "arrowclosed|arrowClosed|MarkerType\.Arrow" in "/Users/gwaldau/Cursor projects/adventure builder" • 2 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `./components/editor/FlowCanvas.tsx` | `type: 'arrowclosed',` | L199 |
+| `./components/editor/FlowCanvas.tsx` | `markerEnd: \{ type: 'arrowclosed', color: '#1083C0' \},` | L273 |
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/gwaldau/Cursor projects/adventure builder/components/editor/FlowCanvas.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/gwaldau/Cursor projects/adventure builder/package.json</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+**Updating MarkerType functionality**
+
+I think reactflow 11.11.0 likely supports the MarkerType enum. I'll need to import MarkerType and update the `markerEnd` in edges and `defaultEdgeOptions`. I guess I'll also check the DeletableEdge since it uses the `markerEnd` prop that needs updating. I should apply the patch and then run a type check. If I run `npm run build`, will it be blocked due to network issues? Since it’s local, I’ll just go ahead and do it in the sandbox. After that, I’ll commit and push to main, ensuring I have the right permissions for the SSH keys. Let's get this patched!</details></think>
+
+---
+
+Nice—Netlify is failing because TypeScript is stricter than your local dev server: React Flow v11 expects `markerEnd.type` to be `MarkerType.ArrowClosed` (enum), not the lowercase string `'arrowclosed'`. I’m going to patch both edge definitions in `FlowCanvas.tsx`, run a local `next build`, then commit + push to `main`.
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="apply_patch">
+<details>
+<summary>Tool use: **apply_patch**</summary>
+
+
+Parameters:
+
+```json
+{
+  "relativeWorkspacePath": "components/editor/FlowCanvas.tsx"
+}
+```
+Additional data:
+
+```json
+{
+  "codeblockId": "f7bef1eb-ddc3-4d91-929c-99ec84110623",
+  "codeblock": {
+    "uri": {
+      "scheme": "file",
+      "authority": "",
+      "path": "/Users/gwaldau/Cursor projects/adventure builder/components/editor/FlowCanvas.tsx",
+      "query": "",
+      "fragment": "",
+      "_formatted": "file:///Users/gwaldau/Cursor%20projects/adventure%20builder/components/editor/FlowCanvas.tsx",
+      "_fsPath": "/Users/gwaldau/Cursor projects/adventure builder/components/editor/FlowCanvas.tsx"
+    },
+    "codeblockId": "f7bef1eb-ddc3-4d91-929c-99ec84110623",
+    "codeBlockIdx": 0,
+    "content": "'use client';\n\nimport { useCallback, useMemo, useRef, useState } from 'react';\nimport ReactFlow, {\n  Background,\n  Controls,\n  MiniMap,\n  Node,\n  Edge,\n  Connection,\n  NodeTypes,\n  EdgeTypes,\n  BackgroundVariant,\n  useStore,\n  MarkerType,\n} from 'reactflow';\nimport 'reactflow/dist/style.css';\nimport { CardNode } from './CardNode';\nimport { DeletableEdge } from './DeletableEdge';\nimport type { AppSchema } from '@/instant/schema';\n\ntype Card = AppSchema['cards'];\ntype Choice = AppSchema['choices'];\n\ninterface FlowCanvasProps {\n  cards: Card[];\n  choices: Choice[];\n  cardImages: Record&lt;string, string&gt;;\n  onNodeDragStop: (cardId: string, x: number, y: number) =&gt; void;\n  onConnect: (sourceCardId: string, targetCardId: string, choiceId?: string) =&gt; void;\n  onNodeClick: (cardId: string) =&gt; void;\n  onDeleteEdge?: (choiceId: string) =&gt; void;\n  selectedCardId: string | null;\n}\n\nconst nodeTypes: NodeTypes = {\n  cardNode: CardNode,\n};\n\nconst edgeTypes: EdgeTypes = {\n  deletable: DeletableEdge,\n};\n\n// Ghost preview component that follows the mouse during drag\n// This component must be rendered inside ReactFlow to access useReactFlow hook\nfunction DragPreviewInner({\n  node,\n  position,\n  choices,\n}: {\n  node: Node;\n  position: { x: number; y: number };\n  choices: Choice[];\n}) {\n  const nodeData = node.data as CardNodeData;\n  const cardChoices = choices\n    .filter((c) =&gt; c.cardId === nodeData.card.id)\n    .sort((a, b) =&gt; a.order - b.order);\n  const zoom = useStore((state) =&gt; state.transform[2]);\n\n  return (\n    &lt;div\n      className=\"react-flow__node react-flow__nodesselection-none pointer-events-none\"\n      style={{\n        position: 'absolute',\n        left: position.x,\n        top: position.y,\n        transform: &#96;translate(-50%, -50%) scale(${zoom})&#96;,\n        width: '256px',\n        opacity: 0.5,\n        zIndex: 1000,\n      }}\n    &gt;\n      &lt;div className=\"relative bg-white rounded-lg shadow-lg overflow-hidden border-2 border-gray-300\"&gt;\n        {/* Image thumbnail */}\n        &lt;div className=\"w-full flex justify-center\" style={{ height: '126px', backgroundColor: '#f3f4f6' }}&gt;\n          {nodeData.imageUrl ? (\n            &lt;img\n              src={nodeData.imageUrl}\n              alt={nodeData.card.caption || 'Card image'}\n              className=\"object-cover\"\n              style={{ width: '224px', height: '126px' }}\n            /&gt;\n          ) : (\n            &lt;div className=\"w-full h-full flex items-center justify-center bg-gray-100 text-gray-400 text-xs\"&gt;\n              No Image\n            &lt;/div&gt;\n          )}\n        &lt;/div&gt;\n\n        {/* Caption */}\n        &lt;div className=\"px-3 py-2 min-h-[60px]\"&gt;\n          &lt;p\n            className=\"text-sm text-gray-800 leading-tight\"\n            style={{\n              display: '-webkit-box',\n              WebkitLineClamp: 3,\n              WebkitBoxOrient: 'vertical',\n              overflow: 'hidden',\n              textOverflow: 'ellipsis',\n            }}\n          &gt;\n            {nodeData.card.caption || 'Untitled Card'}\n          &lt;/p&gt;\n        &lt;/div&gt;\n\n        {/* Choices */}\n        {cardChoices.length &gt; 0 &amp;&amp; (\n          &lt;div className=\"px-3 pb-3 space-y-2\"&gt;\n            {cardChoices.map((choice) =&gt; (\n              &lt;div key={choice.id} className=\"relative flex items-center gap-2\"&gt;\n                &lt;button\n                  className=\"flex-1 bg-blue-600 text-white text-xs px-2 py-1.5 rounded text-left truncate\"\n                  disabled\n                &gt;\n                  {choice.label &amp;&amp; choice.label.length &gt; 30\n                    ? choice.label.substring(0, 30) + '...'\n                    : choice.label || 'Choice'}\n                &lt;/button&gt;\n              &lt;/div&gt;\n            ))}\n          &lt;/div&gt;\n        )}\n      &lt;/div&gt;\n    &lt;/div&gt;\n  );\n}\n\ninterface CardNodeData {\n  card: Card;\n  imageUrl: string | null;\n  choices: Choice[];\n  isSelected: boolean;\n}\n\nexport function FlowCanvas({\n  cards,\n  choices,\n  cardImages,\n  onNodeDragStop,\n  onConnect,\n  onNodeClick,\n  onDeleteEdge,\n  selectedCardId,\n}: FlowCanvasProps) {\n  const containerRef = useRef&lt;HTMLDivElement | null&gt;(null);\n  const [draggedNodeId, setDraggedNodeId] = useState&lt;string | null&gt;(null);\n  const [dragPosition, setDragPosition] = useState&lt;{ x: number; y: number } | null&gt;(null);\n\n  const getRelativePosition = useCallback((event: React.MouseEvent) =&gt; {\n    const rect = containerRef.current?.getBoundingClientRect();\n    if (!rect) return null;\n    return {\n      x: event.clientX - rect.left,\n      y: event.clientY - rect.top,\n    };\n  }, []);\n\n  const initialNodes: Node[] = useMemo(\n    () =&gt;\n      cards.map((card) =&gt; ({\n        id: card.id,\n        type: 'cardNode',\n        position: { x: card.positionX, y: card.positionY },\n        data: {\n          card,\n          imageUrl: cardImages[card.id] || null,\n          choices,\n          isSelected: card.id === selectedCardId,\n        },\n      })),\n    [cards, cardImages, choices, selectedCardId]\n  );\n\n  const handleEdgeDelete = useCallback(\n    (edgeId: string) =&gt; {\n      if (onDeleteEdge) {\n        onDeleteEdge(edgeId);\n      }\n    },\n    [onDeleteEdge]\n  );\n\n  const initialEdges: Edge[] = useMemo(\n    () =&gt;\n      choices\n        .filter((choice) =&gt; choice.targetCardId)\n        .map((choice) =&gt; ({\n          id: choice.id,\n          type: 'deletable',\n          source: choice.cardId,\n          sourceHandle: &#96;choice-${choice.id}&#96;, // Connect from the choice handle\n          target: choice.targetCardId!,\n          animated: true,\n          style: { \n            stroke: '#1083C0',\n            strokeWidth: 2,\n          },\n          markerEnd: {\n            type: MarkerType.ArrowClosed,\n            color: '#1083C0',\n          },\n          data: {\n            onDelete: handleEdgeDelete,\n          },\n        })),\n    [choices, handleEdgeDelete]\n  );\n\n  const handleNodeDragStart = useCallback((event: React.MouseEvent, node: Node) =&gt; {\n    setDraggedNodeId(node.id);\n    const pos = getRelativePosition(event);\n    if (pos) setDragPosition(pos);\n  }, [getRelativePosition]);\n\n  const handleNodeDrag = useCallback((event: React.MouseEvent, node: Node) =&gt; {\n    if (draggedNodeId === node.id) {\n      const pos = getRelativePosition(event);\n      if (pos) setDragPosition(pos);\n    }\n  }, [draggedNodeId, getRelativePosition]);\n\n  const handleNodeDragStop = useCallback(\n    (_: any, node: Node) =&gt; {\n      setDraggedNodeId(null);\n      setDragPosition(null);\n      onNodeDragStop(node.id, node.position.x, node.position.y);\n    },\n    [onNodeDragStop]\n  );\n\n  const handleConnect = useCallback(\n    (connection: Connection) =&gt; {\n      if (connection.source &amp;&amp; connection.target) {\n        // Extract choiceId from sourceHandle if it's a choice connection\n        const choiceId = connection.sourceHandle?.startsWith('choice-')\n          ? connection.sourceHandle.replace('choice-', '')\n          : undefined;\n        \n        onConnect(connection.source, connection.target, choiceId);\n      }\n    },\n    [onConnect]\n  );\n\n  const handleNodeClick = useCallback(\n    (_: React.MouseEvent, node: Node) =&gt; {\n      onNodeClick(node.id);\n    },\n    [onNodeClick]\n  );\n\n  // Get the dragged node data for the ghost preview\n  const draggedNode = draggedNodeId\n    ? initialNodes.find((n) =&gt; n.id === draggedNodeId)\n    : null;\n\n  return (\n    &lt;div className=\"w-full h-full relative\" ref={containerRef}&gt;\n      &lt;ReactFlow\n        nodes={initialNodes}\n        edges={initialEdges}\n        onNodeDragStart={handleNodeDragStart}\n        onNodeDrag={handleNodeDrag}\n        onNodeDragStop={handleNodeDragStop}\n        onConnect={handleConnect}\n        onNodeClick={handleNodeClick}\n        nodeTypes={nodeTypes}\n        edgeTypes={edgeTypes}\n        fitView\n        fitViewOptions={{ padding: 0.2 }}\n        defaultEdgeOptions={{\n          style: { stroke: '#1083C0', strokeWidth: 2 },\n          markerEnd: { type: MarkerType.ArrowClosed, color: '#1083C0' },\n        }}\n      &gt;\n        &lt;Background variant={BackgroundVariant.Dots} gap={12} size={1} /&gt;\n        &lt;Controls /&gt;\n        &lt;MiniMap \n          nodeColor={(node) =&gt; {\n            if (node.data?.isSelected) return '#1083C0';\n            return '#94a3b8';\n          }}\n          maskColor=\"rgba(0, 0, 0, 0.1)\"\n        /&gt;\n        \n        {/* Ghost preview that follows the mouse */}\n        {draggedNode &amp;&amp; dragPosition &amp;&amp; (\n          &lt;DragPreviewInner\n            node={draggedNode}\n            position={dragPosition}\n            choices={choices}\n          /&gt;\n        )}\n      &lt;/ReactFlow&gt;\n    &lt;/div&gt;\n  );\n}\n",
+    "languageId": "typescriptreact"
+  }
+}
+```
+Result:
+
+```json
+{
+  "diff": {
+    "chunks": [
+      {
+        "diffString": "    BackgroundVariant,\n    useStore,\n+   MarkerType,\n  } from 'reactflow';\n  import 'reactflow/dist/style.css';",
+        "oldStart": 13,
+        "newStart": 13,
+        "oldLines": 4,
+        "newLines": 5,
+        "linesAdded": 1
+      },
+      {
+        "diffString": "            },\n            markerEnd: {\n-             type: 'arrowclosed',\n+             type: MarkerType.ArrowClosed,\n              color: '#1083C0',\n            },",
+        "oldStart": 197,
+        "newStart": 198,
+        "oldLines": 5,
+        "newLines": 5,
+        "linesRemoved": 1,
+        "linesAdded": 1
+      },
+      {
+        "diffString": "          defaultEdgeOptions={{\n            style: { stroke: '#1083C0', strokeWidth: 2 },\n-           markerEnd: { type: 'arrowclosed', color: '#1083C0' },\n+           markerEnd: { type: MarkerType.ArrowClosed, color: '#1083C0' },\n          }}\n        &gt;",
+        "oldStart": 271,
+        "newStart": 272,
+        "oldLines": 5,
+        "newLines": 5,
+        "linesRemoved": 1,
+        "linesAdded": 1
+      }
+    ],
+    "editor": "EDITOR_AI"
+  },
+  "shouldAutoFixLints": true,
+  "resultForModel": "Success. Updated the following files:\nM components/editor/FlowCanvas.tsx",
+  "contentsAfterEdit": "'use client';\n\nimport { useCallback, useMemo, useRef, useState } from 'react';\nimport ReactFlow, {\n  Background,\n  Controls,\n  MiniMap,\n  Node,\n  Edge,\n  Connection,\n  NodeTypes,\n  EdgeTypes,\n  BackgroundVariant,\n  useStore,\n  MarkerType,\n} from 'reactflow';\nimport 'reactflow/dist/style.css';\nimport { CardNode } from './CardNode';\nimport { DeletableEdge } from './DeletableEdge';\nimport type { AppSchema } from '@/instant/schema';\n\ntype Card = AppSchema['cards'];\ntype Choice = AppSchema['choices'];\n\ninterface FlowCanvasProps {\n  cards: Card[];\n  choices: Choice[];\n  cardImages: Record&lt;string, string&gt;;\n  onNodeDragStop: (cardId: string, x: number, y: number) =&gt; void;\n  onConnect: (sourceCardId: string, targetCardId: string, choiceId?: string) =&gt; void;\n  onNodeClick: (cardId: string) =&gt; void;\n  onDeleteEdge?: (choiceId: string) =&gt; void;\n  selectedCardId: string | null;\n}\n\nconst nodeTypes: NodeTypes = {\n  cardNode: CardNode,\n};\n\nconst edgeTypes: EdgeTypes = {\n  deletable: DeletableEdge,\n};\n\n// Ghost preview component that follows the mouse during drag\n// This component must be rendered inside ReactFlow to access useReactFlow hook\nfunction DragPreviewInner({\n  node,\n  position,\n  choices,\n}: {\n  node: Node;\n  position: { x: number; y: number };\n  choices: Choice[];\n}) {\n  const nodeData = node.data as CardNodeData;\n  const cardChoices = choices\n    .filter((c) =&gt; c.cardId === nodeData.card.id)\n    .sort((a, b) =&gt; a.order - b.order);\n  const zoom = useStore((state) =&gt; state.transform[2]);\n\n  return (\n    &lt;div\n      className=\"react-flow__node react-flow__nodesselection-none pointer-events-none\"\n      style={{\n        position: 'absolute',\n        left: position.x,\n        top: position.y,\n        transform: &#96;translate(-50%, -50%) scale(${zoom})&#96;,\n        width: '256px',\n        opacity: 0.5,\n        zIndex: 1000,\n      }}\n    &gt;\n      &lt;div className=\"relative bg-white rounded-lg shadow-lg overflow-hidden border-2 border-gray-300\"&gt;\n        {/* Image thumbnail */}\n        &lt;div className=\"w-full flex justify-center\" style={{ height: '126px', backgroundColor: '#f3f4f6' }}&gt;\n          {nodeData.imageUrl ? (\n            &lt;img\n              src={nodeData.imageUrl}\n              alt={nodeData.card.caption || 'Card image'}\n              className=\"object-cover\"\n              style={{ width: '224px', height: '126px' }}\n            /&gt;\n          ) : (\n            &lt;div className=\"w-full h-full flex items-center justify-center bg-gray-100 text-gray-400 text-xs\"&gt;\n              No Image\n            &lt;/div&gt;\n          )}\n        &lt;/div&gt;\n\n        {/* Caption */}\n        &lt;div className=\"px-3 py-2 min-h-[60px]\"&gt;\n          &lt;p\n            className=\"text-sm text-gray-800 leading-tight\"\n            style={{\n              display: '-webkit-box',\n              WebkitLineClamp: 3,\n              WebkitBoxOrient: 'vertical',\n              overflow: 'hidden',\n              textOverflow: 'ellipsis',\n            }}\n          &gt;\n            {nodeData.card.caption || 'Untitled Card'}\n          &lt;/p&gt;\n        &lt;/div&gt;\n\n        {/* Choices */}\n        {cardChoices.length &gt; 0 &amp;&amp; (\n          &lt;div className=\"px-3 pb-3 space-y-2\"&gt;\n            {cardChoices.map((choice) =&gt; (\n              &lt;div key={choice.id} className=\"relative flex items-center gap-2\"&gt;\n                &lt;button\n                  className=\"flex-1 bg-blue-600 text-white text-xs px-2 py-1.5 rounded text-left truncate\"\n                  disabled\n                &gt;\n                  {choice.label &amp;&amp; choice.label.length &gt; 30\n                    ? choice.label.substring(0, 30) + '...'\n                    : choice.label || 'Choice'}\n                &lt;/button&gt;\n              &lt;/div&gt;\n            ))}\n          &lt;/div&gt;\n        )}\n      &lt;/div&gt;\n    &lt;/div&gt;\n  );\n}\n\ninterface CardNodeData {\n  card: Card;\n  imageUrl: string | null;\n  choices: Choice[];\n  isSelected: boolean;\n}\n\nexport function FlowCanvas({\n  cards,\n  choices,\n  cardImages,\n  onNodeDragStop,\n  onConnect,\n  onNodeClick,\n  onDeleteEdge,\n  selectedCardId,\n}: FlowCanvasProps) {\n  const containerRef = useRef&lt;HTMLDivElement | null&gt;(null);\n  const [draggedNodeId, setDraggedNodeId] = useState&lt;string | null&gt;(null);\n  const [dragPosition, setDragPosition] = useState&lt;{ x: number; y: number } | null&gt;(null);\n\n  const getRelativePosition = useCallback((event: React.MouseEvent) =&gt; {\n    const rect = containerRef.current?.getBoundingClientRect();\n    if (!rect) return null;\n    return {\n      x: event.clientX - rect.left,\n      y: event.clientY - rect.top,\n    };\n  }, []);\n\n  const initialNodes: Node[] = useMemo(\n    () =&gt;\n      cards.map((card) =&gt; ({\n        id: card.id,\n        type: 'cardNode',\n        position: { x: card.positionX, y: card.positionY },\n        data: {\n          card,\n          imageUrl: cardImages[card.id] || null,\n          choices,\n          isSelected: card.id === selectedCardId,\n        },\n      })),\n    [cards, cardImages, choices, selectedCardId]\n  );\n\n  const handleEdgeDelete = useCallback(\n    (edgeId: string) =&gt; {\n      if (onDeleteEdge) {\n        onDeleteEdge(edgeId);\n      }\n    },\n    [onDeleteEdge]\n  );\n\n  const initialEdges: Edge[] = useMemo(\n    () =&gt;\n      choices\n        .filter((choice) =&gt; choice.targetCardId)\n        .map((choice) =&gt; ({\n          id: choice.id,\n          type: 'deletable',\n          source: choice.cardId,\n          sourceHandle: &#96;choice-${choice.id}&#96;, // Connect from the choice handle\n          target: choice.targetCardId!,\n          animated: true,\n          style: { \n            stroke: '#1083C0',\n            strokeWidth: 2,\n          },\n          markerEnd: {\n            type: MarkerType.ArrowClosed,\n            color: '#1083C0',\n          },\n          data: {\n            onDelete: handleEdgeDelete,\n          },\n        })),\n    [choices, handleEdgeDelete]\n  );\n\n  const handleNodeDragStart = useCallback((event: React.MouseEvent, node: Node) =&gt; {\n    setDraggedNodeId(node.id);\n    const pos = getRelativePosition(event);\n    if (pos) setDragPosition(pos);\n  }, [getRelativePosition]);\n\n  const handleNodeDrag = useCallback((event: React.MouseEvent, node: Node) =&gt; {\n    if (draggedNodeId === node.id) {\n      const pos = getRelativePosition(event);\n      if (pos) setDragPosition(pos);\n    }\n  }, [draggedNodeId, getRelativePosition]);\n\n  const handleNodeDragStop = useCallback(\n    (_: any, node: Node) =&gt; {\n      setDraggedNodeId(null);\n      setDragPosition(null);\n      onNodeDragStop(node.id, node.position.x, node.position.y);\n    },\n    [onNodeDragStop]\n  );\n\n  const handleConnect = useCallback(\n    (connection: Connection) =&gt; {\n      if (connection.source &amp;&amp; connection.target) {\n        // Extract choiceId from sourceHandle if it's a choice connection\n        const choiceId = connection.sourceHandle?.startsWith('choice-')\n          ? connection.sourceHandle.replace('choice-', '')\n          : undefined;\n        \n        onConnect(connection.source, connection.target, choiceId);\n      }\n    },\n    [onConnect]\n  );\n\n  const handleNodeClick = useCallback(\n    (_: React.MouseEvent, node: Node) =&gt; {\n      onNodeClick(node.id);\n    },\n    [onNodeClick]\n  );\n\n  // Get the dragged node data for the ghost preview\n  const draggedNode = draggedNodeId\n    ? initialNodes.find((n) =&gt; n.id === draggedNodeId)\n    : null;\n\n  return (\n    &lt;div className=\"w-full h-full relative\" ref={containerRef}&gt;\n      &lt;ReactFlow\n        nodes={initialNodes}\n        edges={initialEdges}\n        onNodeDragStart={handleNodeDragStart}\n        onNodeDrag={handleNodeDrag}\n        onNodeDragStop={handleNodeDragStop}\n        onConnect={handleConnect}\n        onNodeClick={handleNodeClick}\n        nodeTypes={nodeTypes}\n        edgeTypes={edgeTypes}\n        fitView\n        fitViewOptions={{ padding: 0.2 }}\n        defaultEdgeOptions={{\n          style: { stroke: '#1083C0', strokeWidth: 2 },\n          markerEnd: { type: MarkerType.ArrowClosed, color: '#1083C0' },\n        }}\n      &gt;\n        &lt;Background variant={BackgroundVariant.Dots} gap={12} size={1} /&gt;\n        &lt;Controls /&gt;\n        &lt;MiniMap \n          nodeColor={(node) =&gt; {\n            if (node.data?.isSelected) return '#1083C0';\n            return '#94a3b8';\n          }}\n          maskColor=\"rgba(0, 0, 0, 0.1)\"\n        /&gt;\n        \n        {/* Ghost preview that follows the mouse */}\n        {draggedNode &amp;&amp; dragPosition &amp;&amp; (\n          &lt;DragPreviewInner\n            node={draggedNode}\n            position={dragPosition}\n            choices={choices}\n          /&gt;\n        )}\n      &lt;/ReactFlow&gt;\n    &lt;/div&gt;\n  );\n}\n"
+}
+```
+User decision: **accepted**
+
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `components/editor/FlowCanvas.tsx`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_cmd">
+<details><summary>Tool use: **run_terminal_cmd**</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+

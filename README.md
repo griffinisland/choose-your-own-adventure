@@ -22,7 +22,6 @@ A web-based visual novel and choose-your-own-adventure builder and player, inspi
 - JSON import/export for backup and sharing
 
 ### 🏠 Gallery
-- Public gallery of all published projects
 - Thumbnail images (1280x720 recommended)
 - Inline project title editing
 - Play and Edit buttons

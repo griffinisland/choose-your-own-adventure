@@ -38,8 +38,11 @@ export default function LoginPage() {
       <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-md">
         <div>
           <h1 className="text-3xl font-bold text-center text-gray-900">
-            HyperCard Adventures
+            Adventure Builder
           </h1>
+          <p className="text-sm text-center text-gray-500 mt-1">
+            v2.0
+          </p>
           <h2 className="mt-6 text-center text-xl font-medium text-gray-600">
             Sign in to your account
           </h2>

@@ -315,7 +315,8 @@ export function FlowCanvas({
     const handleGlobalMouseUp = (e: MouseEvent) => {
       // Only clear if we're dragging and the mouseup is outside ReactFlow
       // This prevents interference with normal ReactFlow interactions
-      if (draggedNodeId && !containerRef.current?.contains(e.target as Node)) {
+      // Cast e.target to DOM Node type (not React Flow Node type)
+      if (draggedNodeId && e.target && containerRef.current && !containerRef.current.contains(e.target as unknown as globalThis.Node)) {
         // Clear drag state if it wasn't cleared properly
         setDraggedNodeId(null);
         setDragPosition(null);
@@ -333,7 +334,7 @@ export function FlowCanvas({
 
   // Get the dragged node data for the ghost preview
   const draggedNode = draggedNodeId
-    ? initialNodes.find((n) => n.id === draggedNodeId)
+    ? initialNodes.find((n) => n.id === draggedNodeId) ?? null
     : null;
 
   return (
@@ -343,13 +344,9 @@ export function FlowCanvas({
         edges={initialEdges}
         onNodeDragStart={handleNodeDragStart}
         onNodeDrag={handleNodeDrag}
-      onNodeDragStop={handleNodeDragStop}
-      onConnect={handleConnect}
-      onNodeClick={handleNodeClick}
-      nodesDraggable={true}
-      nodesConnectable={true}
-      elementsSelectable={true}
-      selectNodesOnDrag={false}
+        onNodeDragStop={handleNodeDragStop}
+        onConnect={handleConnect}
+        onNodeClick={handleNodeClick}
         draggedNode={draggedNode}
         dragPosition={dragPosition}
         choices={choices}

@@ -17,6 +17,7 @@ import {
   createAsset,
   updateAsset,
   createCard,
+  duplicateCard,
 } from '@/lib/instantdb/mutations';
 import { FlowCanvas } from '@/components/editor/FlowCanvas';
 import { Inspector } from '@/components/editor/Inspector';
@@ -32,7 +33,7 @@ export default function EditPage() {
   const projectId = params?.projectId as string;
   const router = useRouter();
   const { user } = useAuth();
-  const { project, cards, choices, assets, isLoading } =
+  const { project, cards, choices, assets, sceneElements, isLoading } =
     useProjectForEdit(projectId);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
 
@@ -41,34 +42,34 @@ export default function EditPage() {
     $files: {},
   });
 
-  const cardImages = useMemo(() => {
-    const imageMap: Record<string, string> = {};
+  // Helper functions for file URL resolution
+  const fileMap = useMemo(() => {
+    const map = new Map<string, any>();
     const allFiles = (filesData?.$files as any[]) || [];
-
-    // Create a map of storageKey -> file object
-    const fileMap = new Map<string, any>();
     allFiles.forEach((file: any) => {
       const filePath = file.path || file.key || file.name;
       if (filePath) {
-        fileMap.set(filePath, file);
+        map.set(filePath, file);
       }
     });
+    return map;
+  }, [filesData]);
 
-    // Helper to check if URL is from the correct InstantDB storage domain
-    const isValidInstantDbUrl = (url: string | undefined | null): boolean => {
-      if (!url) return false;
-      return url.includes('instant-storage.s3.amazonaws.com');
-    };
+  const isValidInstantDbUrl = (url: string | undefined | null): boolean => {
+    if (!url) return false;
+    return url.includes('instant-storage.s3.amazonaws.com');
+  };
 
-    // Helper to get URL from file object (the ONLY reliable source)
-    const getFileUrl = (file: any): string | null => {
-      if (!file) return null;
-      if (file.url && isValidInstantDbUrl(file.url)) return file.url;
-      if (file.src && isValidInstantDbUrl(file.src)) return file.src;
-      if (file.downloadUrl && isValidInstantDbUrl(file.downloadUrl)) return file.downloadUrl;
-      return null;
-    };
+  const getFileUrl = (file: any): string | null => {
+    if (!file) return null;
+    if (file.url && isValidInstantDbUrl(file.url)) return file.url;
+    if (file.src && isValidInstantDbUrl(file.src)) return file.src;
+    if (file.downloadUrl && isValidInstantDbUrl(file.downloadUrl)) return file.downloadUrl;
+    return null;
+  };
 
+  const cardImages = useMemo(() => {
+    const imageMap: Record<string, string> = {};
     (cards || []).forEach((card) => {
       if (card.assetId) {
         const asset = (assets || []).find((a) => a.id === card.assetId);
@@ -82,7 +83,49 @@ export default function EditPage() {
       }
     });
     return imageMap;
-  }, [cards, assets, filesData]);
+  }, [cards, assets, fileMap]);
+
+  // Background images for cards
+  // Fall back to card.assetId (old images) if backgroundAssetId is not set
+  const backgroundImages = useMemo(() => {
+    const imageMap: Record<string, string> = {};
+    (cards || []).forEach((card) => {
+      // First try backgroundAssetId (new scene builder images)
+      let assetId = card.backgroundAssetId;
+      // If no backgroundAssetId, fall back to assetId (old card images)
+      if (!assetId && card.assetId) {
+        assetId = card.assetId;
+      }
+      
+      if (assetId) {
+        const asset = (assets || []).find((a) => a.id === assetId);
+        if (asset?.storageKey) {
+          const file = fileMap.get(asset.storageKey);
+          const url = getFileUrl(file);
+          if (url) {
+            imageMap[card.id] = url;
+          }
+        }
+      }
+    });
+    return imageMap;
+  }, [cards, assets, fileMap]);
+
+  // Element images for scene elements
+  const elementImages = useMemo(() => {
+    const imageMap: Record<string, string> = {};
+    (sceneElements || []).forEach((element) => {
+      const asset = (assets || []).find((a) => a.id === element.assetId);
+      if (asset?.storageKey) {
+        const file = fileMap.get(asset.storageKey);
+        const url = getFileUrl(file);
+        if (url) {
+          imageMap[element.id] = url;
+        }
+      }
+    });
+    return imageMap;
+  }, [sceneElements, assets, fileMap]);
 
   const selectedCard = (cards || []).find((c) => c.id === selectedCardId) || null;
   const isStartCard = project?.startCardId === selectedCardId;
@@ -167,15 +210,17 @@ export default function EditPage() {
     [projectId, cards]
   );
 
+
   const handleExport = useCallback(() => {
     if (!project) return;
     downloadProject(
       project as AppSchema['projects'],
       (cards || []) as AppSchema['cards'][],
       (choices || []) as AppSchema['choices'][],
+      (sceneElements || []) as AppSchema['sceneElements'][],
       (assets || []) as AppSchema['assets'][]
     );
-  }, [project, cards, choices, assets]);
+  }, [project, cards, choices, sceneElements, assets]);
 
   const handleImport = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -244,6 +289,19 @@ export default function EditPage() {
       alert('Failed to create card. Please try again.');
     }
   }, [projectId, cards]);
+
+  const handleDuplicateCard = useCallback(
+    async (cardId: string) => {
+      try {
+        const newCardId = await duplicateCard(cardId, projectId);
+        setSelectedCardId(newCardId);
+      } catch (error) {
+        console.error('Failed to duplicate card:', error);
+        alert('Failed to duplicate card. Please try again.');
+      }
+    },
+    [projectId]
+  );
 
   const handleNodeDragStop = useCallback(
     async (cardId: string, x: number, y: number) => {
@@ -390,6 +448,9 @@ export default function EditPage() {
             cards={(cards || []) as AppSchema['cards'][]}
             choices={(choices || []) as AppSchema['choices'][]}
             cardImages={cardImages}
+            backgroundImages={backgroundImages}
+            sceneElements={(sceneElements || []) as AppSchema['sceneElements'][]}
+            elementImages={elementImages}
             onNodeDragStop={handleNodeDragStop}
             onConnect={handleConnect}
             onNodeClick={setSelectedCardId}
@@ -403,12 +464,17 @@ export default function EditPage() {
           card={selectedCard as AppSchema['cards'] | null}
           allCards={(cards || []) as AppSchema['cards'][]}
           choices={(choices || []) as AppSchema['choices'][]}
+          sceneElements={(sceneElements || []) as AppSchema['sceneElements'][]}
+          assets={(assets || []) as AppSchema['assets'][]}
+          backgroundImageUrl={selectedCard ? backgroundImages[selectedCard.id] || null : null}
+          elementImageUrls={elementImages}
+          projectId={projectId}
           onUpdateCard={handleUpdateCard}
           onUpdateChoice={handleUpdateChoice}
           onCreateChoice={handleCreateChoice}
           onDeleteChoice={handleDeleteChoice}
           onSetStartCard={handleSetStartCard}
-          onUploadImage={handleUploadImage}
+          onDuplicateCard={handleDuplicateCard}
           onDeleteCard={handleDeleteCard}
           isStartCard={isStartCard}
         />

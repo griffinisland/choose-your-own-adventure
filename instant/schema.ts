@@ -14,6 +14,7 @@ type AppSchema = {
     projectId: string;
     caption: string;
     assetId: string | null;
+    backgroundAssetId: string | null;
     positionX: number;
     positionY: number;
   };
@@ -34,6 +35,17 @@ type AppSchema = {
     contentType?: string;
     bytes?: number;
   };
+  sceneElements: {
+    id: string;
+    cardId: string;
+    assetId: string;
+    positionX: number;
+    positionY: number;
+    width?: number;
+    height?: number;
+    zIndex: number;
+    targetCardId: string | null;
+  };
 };
 
 export type { AppSchema };
@@ -49,6 +61,9 @@ export const schema = {
     rules: {},
   },
   assets: {
+    rules: {},
+  },
+  sceneElements: {
     rules: {},
   },
 } as const;

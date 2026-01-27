@@ -9,9 +9,11 @@ import {
 } from '@/lib/instantdb/mutations';
 import type { ExportedProjectV1 } from './types';
 import type { AppSchema } from '@/instant/schema';
+import { createSceneElement } from '@/lib/instantdb/mutations';
 
 type Card = AppSchema['cards'];
 type Choice = AppSchema['choices'];
+type SceneElement = AppSchema['sceneElements'];
 
 export async function importProject(
   data: ExportedProjectV1,
@@ -27,6 +29,8 @@ export async function importProject(
   const cardIdMap = createIdMap(data.cards);
   const choiceIdMap = createIdMap(data.choices);
   const assetIdMap = createIdMap(data.assets);
+  // Handle backward compatibility: sceneElements may not exist in old exports
+  const sceneElementIdMap = createIdMap((data as any).sceneElements || []);
 
   const firstImportedCard = data.cards[0];
   if (firstImportedCard) {
@@ -53,6 +57,7 @@ export async function importProject(
   for (const card of data.cards) {
     const newCardId = cardIdMap.get(card.id)!;
     const remappedAssetId = remapId(card.assetId, assetIdMap);
+    const remappedBackgroundAssetId = remapId(card.backgroundAssetId, assetIdMap);
 
     if (newCardId === initialCardId) {
       txs.push(
@@ -60,6 +65,7 @@ export async function importProject(
           projectId,
           caption: card.caption,
           assetId: remappedAssetId,
+          backgroundAssetId: remappedBackgroundAssetId,
           positionX: card.positionX,
           positionY: card.positionY,
         })
@@ -70,6 +76,7 @@ export async function importProject(
           projectId,
           caption: card.caption,
           assetId: remappedAssetId,
+          backgroundAssetId: remappedBackgroundAssetId,
           positionX: card.positionX,
           positionY: card.positionY,
         })
@@ -109,6 +116,34 @@ export async function importProject(
   );
 
   await db.transact(txs);
+
+  // Import scene elements (backward compatible: may not exist in old exports)
+  const sceneElementsToImport = (data as any).sceneElements || [];
+  if (sceneElementsToImport.length > 0) {
+    const sceneElementTxs = [];
+    for (const element of sceneElementsToImport) {
+      const newElementId = sceneElementIdMap.get(element.id)!;
+      const remappedCardId = remapId(element.cardId, cardIdMap)!;
+      const remappedAssetId = remapId(element.assetId, assetIdMap)!;
+      const remappedTargetCardId = remapId(element.targetCardId, cardIdMap);
+
+      sceneElementTxs.push(
+        db.tx.sceneElements[newElementId].update({
+          cardId: remappedCardId,
+          assetId: remappedAssetId,
+          positionX: element.positionX,
+          positionY: element.positionY,
+          width: element.width,
+          height: element.height,
+          zIndex: element.zIndex,
+          targetCardId: remappedTargetCardId,
+        })
+      );
+    }
+    if (sceneElementTxs.length > 0) {
+      await db.transact(sceneElementTxs);
+    }
+  }
 
   return { projectId };
 }

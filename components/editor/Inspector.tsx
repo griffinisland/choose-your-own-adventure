@@ -1,15 +1,23 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import type { AppSchema } from '@/instant/schema';
 
 type Card = AppSchema['cards'];
 type Choice = AppSchema['choices'];
+type SceneElement = AppSchema['sceneElements'];
+type Asset = AppSchema['assets'];
 
 interface InspectorProps {
   card: Card | null;
   allCards: Card[];
   choices: Choice[];
+  sceneElements: SceneElement[];
+  assets: Asset[];
+  backgroundImageUrl: string | null;
+  elementImageUrls: Record<string, string>;
+  projectId: string;
   onUpdateCard: (cardId: string, updates: Partial<Card>) => void;
   onUpdateChoice: (choiceId: string, updates: Partial<Choice>) => void;
   onCreateChoice: (
@@ -20,7 +28,7 @@ interface InspectorProps {
   ) => void;
   onDeleteChoice: (choiceId: string) => void;
   onSetStartCard: (cardId: string) => void;
-  onUploadImage: (cardId: string, file: File) => void;
+  onDuplicateCard?: (cardId: string) => void;
   onDeleteCard?: (cardId: string) => void;
   isStartCard: boolean;
 }
@@ -29,17 +37,22 @@ export function Inspector({
   card,
   allCards,
   choices,
+  sceneElements,
+  assets,
+  backgroundImageUrl,
+  elementImageUrls,
+  projectId,
   onUpdateCard,
   onUpdateChoice,
   onCreateChoice,
   onDeleteChoice,
   onSetStartCard,
-  onUploadImage,
+  onDuplicateCard,
   onDeleteCard,
   isStartCard,
 }: InspectorProps) {
+  const router = useRouter();
   const [caption, setCaption] = useState(card?.caption || '');
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setCaption(card?.caption || '');
@@ -54,15 +67,6 @@ export function Inspector({
       }
     },
     [card, onUpdateCard]
-  );
-
-  const handleImageUpload = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (card && e.target.files && e.target.files.length > 0) {
-        onUploadImage(card.id, e.target.files[0]);
-      }
-    },
-    [card, onUploadImage]
   );
 
   const handleAddChoice = useCallback(() => {
@@ -91,9 +95,10 @@ export function Inspector({
   }
 
   return (
-    <div className="w-80 bg-white p-4 border-l border-gray-200 flex-shrink-0 overflow-y-auto">
-      <h2 className="text-lg font-semibold mb-4">Card Inspector</h2>
+    <div className="w-80 bg-white border-l border-gray-200 flex-shrink-0 flex flex-col" style={{ height: '100%' }}>
+      <h2 className="text-lg font-semibold p-4 pb-2">Card Inspector</h2>
 
+      <div className="flex-1 overflow-y-auto p-4" style={{ minHeight: 0 }}>
       <div className="mb-4">
         <label htmlFor="cardCaption" className="block text-sm font-medium text-gray-700 mb-1">
           Caption
@@ -109,23 +114,17 @@ export function Inspector({
 
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Background Image
+          Scene Builder
         </label>
-        <input
-          type="file"
-          accept="image/*"
-          onChange={handleImageUpload}
-          ref={fileInputRef}
-          className="block w-full text-sm text-gray-500
-            file:mr-4 file:py-2 file:px-4
-            file:rounded-md file:border-0
-            file:text-sm file:font-semibold
-            file:bg-blue-50 file:text-blue-700
-            hover:file:bg-blue-100"
-        />
-        {card.assetId && (
-          <p className="text-xs text-gray-500 mt-1">Image uploaded. Upload again to replace.</p>
-        )}
+        <button
+          onClick={() => router.push(`/edit/${projectId}/scene/${card.id}`)}
+          className="w-full px-4 py-2 bg-purple-500 text-white text-sm rounded-md hover:bg-purple-600 transition-colors"
+        >
+          Enter Scene Builder
+        </button>
+        <p className="text-xs text-gray-500 mt-1">
+          Build interactive scenes with background images and clickable elements.
+        </p>
       </div>
 
       <div className="mb-4">
@@ -186,6 +185,14 @@ export function Inspector({
         >
           {isStartCard ? 'Start Card' : 'Set as Start Card'}
         </button>
+        {onDuplicateCard && (
+          <button
+            onClick={() => onDuplicateCard(card.id)}
+            className="w-full mb-2 px-3 py-1.5 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 transition-colors"
+          >
+            Duplicate Card
+          </button>
+        )}
         {onDeleteCard && (
           <button
             onClick={() => {
@@ -198,6 +205,7 @@ export function Inspector({
             Delete Card
           </button>
         )}
+      </div>
       </div>
     </div>
   );

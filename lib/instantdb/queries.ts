@@ -35,22 +35,26 @@ export function useProject(projectId: string) {
         where: { projectId },
       },
     },
+    sceneElements: {},
   });
 
   const project = data?.projects?.[0];
   const cards = data?.cards || [];
   const allChoices = data?.choices || [];
   const assets = data?.assets || [];
+  const allSceneElements = data?.sceneElements || [];
 
   // Filter choices to only those belonging to cards in this project
   const cardIds = new Set(cards.map((c) => c.id));
   const choices = allChoices.filter((ch) => cardIds.has(ch.cardId));
+  const sceneElements = allSceneElements.filter((el) => cardIds.has(el.cardId));
 
   return {
     project,
     cards,
     choices,
     assets,
+    sceneElements,
     isLoading,
     error,
   };
@@ -74,22 +78,26 @@ export function useProjectForEdit(projectId: string) {
         where: { projectId },
       },
     },
+    sceneElements: {},
   });
 
   const project = data?.projects?.[0];
   const cards = data?.cards || [];
   const allChoices = data?.choices || [];
   const assets = data?.assets || [];
+  const allSceneElements = data?.sceneElements || [];
 
   // Filter choices to only those belonging to cards in this project
   const cardIds = new Set(cards.map((c) => c.id));
   const choices = allChoices.filter((ch) => cardIds.has(ch.cardId));
+  const sceneElements = allSceneElements.filter((el) => cardIds.has(el.cardId));
 
   return {
     project,
     cards,
     choices,
     assets,
+    sceneElements,
     isLoading,
     error,
   };

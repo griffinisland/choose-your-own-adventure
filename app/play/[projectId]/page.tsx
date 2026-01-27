@@ -12,7 +12,7 @@ type Asset = AppSchema['assets'];
 export default function PlayPage() {
   const params = useParams();
   const projectId = params?.projectId as string;
-  const { project, cards, choices, assets, isLoading, error } =
+  const { project, cards, choices, assets, sceneElements, isLoading, error } =
     useProject(projectId);
 
   // Query $files to get actual storage URLs (same pattern as edit page)
@@ -20,34 +20,34 @@ export default function PlayPage() {
     $files: {},
   });
 
-  const cardImages = useMemo(() => {
-    const imageMap: Record<string, string> = {};
+  // Helper functions for file URL resolution
+  const fileMap = useMemo(() => {
+    const map = new Map<string, any>();
     const allFiles = (filesData?.$files as any[]) || [];
-
-    // Create a map of storageKey -> file object
-    const fileMap = new Map<string, any>();
     allFiles.forEach((file: any) => {
       const filePath = file.path || file.key || file.name;
       if (filePath) {
-        fileMap.set(filePath, file);
+        map.set(filePath, file);
       }
     });
+    return map;
+  }, [filesData]);
 
-    // Helper to check if URL is from the correct InstantDB storage domain
-    const isValidInstantDbUrl = (url: string | undefined | null): boolean => {
-      if (!url) return false;
-      return url.includes('instant-storage.s3.amazonaws.com');
-    };
+  const isValidInstantDbUrl = (url: string | undefined | null): boolean => {
+    if (!url) return false;
+    return url.includes('instant-storage.s3.amazonaws.com');
+  };
 
-    // Helper to get URL from file object (the ONLY reliable source)
-    const getFileUrl = (file: any): string | null => {
-      if (!file) return null;
-      if (file.url && isValidInstantDbUrl(file.url)) return file.url;
-      if (file.src && isValidInstantDbUrl(file.src)) return file.src;
-      if (file.downloadUrl && isValidInstantDbUrl(file.downloadUrl)) return file.downloadUrl;
-      return null;
-    };
+  const getFileUrl = (file: any): string | null => {
+    if (!file) return null;
+    if (file.url && isValidInstantDbUrl(file.url)) return file.url;
+    if (file.src && isValidInstantDbUrl(file.src)) return file.src;
+    if (file.downloadUrl && isValidInstantDbUrl(file.downloadUrl)) return file.downloadUrl;
+    return null;
+  };
 
+  const cardImages = useMemo(() => {
+    const imageMap: Record<string, string> = {};
     cards.forEach((card) => {
       if (card.assetId) {
         const asset = assets.find((a) => a.id === card.assetId);
@@ -61,7 +61,39 @@ export default function PlayPage() {
       }
     });
     return imageMap;
-  }, [cards, assets, filesData]);
+  }, [cards, assets, fileMap]);
+
+  const backgroundImages = useMemo(() => {
+    const imageMap: Record<string, string> = {};
+    cards.forEach((card) => {
+      if (card.backgroundAssetId) {
+        const asset = assets.find((a) => a.id === card.backgroundAssetId);
+        if (asset?.storageKey) {
+          const file = fileMap.get(asset.storageKey);
+          const url = getFileUrl(file);
+          if (url) {
+            imageMap[card.id] = url;
+          }
+        }
+      }
+    });
+    return imageMap;
+  }, [cards, assets, fileMap]);
+
+  const elementImages = useMemo(() => {
+    const imageMap: Record<string, string> = {};
+    sceneElements.forEach((element) => {
+      const asset = assets.find((a) => a.id === element.assetId);
+      if (asset?.storageKey) {
+        const file = fileMap.get(asset.storageKey);
+        const url = getFileUrl(file);
+        if (url) {
+          imageMap[element.id] = url;
+        }
+      }
+    });
+    return imageMap;
+  }, [sceneElements, assets, fileMap]);
 
   if (isLoading) {
     return (
@@ -114,8 +146,11 @@ export default function PlayPage() {
       choices={choices.filter((ch) =>
         cards.some((c) => c.id === ch.cardId)
       ) as AppSchema['choices'][]}
+      sceneElements={(sceneElements || []) as AppSchema['sceneElements'][]}
       startCardId={project.startCardId ?? null}
       cardImages={cardImages}
+      backgroundImages={backgroundImages}
+      elementImages={elementImages}
     />
   );
 }

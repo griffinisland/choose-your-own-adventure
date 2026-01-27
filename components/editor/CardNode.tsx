@@ -6,16 +6,24 @@ import type { AppSchema } from '@/instant/schema';
 
 type Card = AppSchema['cards'];
 type Choice = AppSchema['choices'];
+type SceneElement = AppSchema['sceneElements'];
 
 interface CardNodeData {
   card: Card;
   imageUrl: string | null;
+  backgroundImageUrl: string | null;
+  sceneElements: SceneElement[];
+  elementImages: Record<string, string>;
   choices: Choice[];
   isSelected: boolean;
 }
 
 export const CardNode = memo(({ data }: NodeProps<CardNodeData>) => {
-  const { card, imageUrl, choices, isSelected } = data;
+  const { card, imageUrl, backgroundImageUrl, sceneElements, elementImages, choices, isSelected } = data;
+  
+  // Thumbnail dimensions
+  const thumbnailWidth = 224;
+  const thumbnailHeight = 126;
 
   // Get choices for this card, sorted by order
   const cardChoices = choices
@@ -42,7 +50,7 @@ export const CardNode = memo(({ data }: NodeProps<CardNodeData>) => {
           ? 'ring-4 ring-[#1083C0]'
           : 'border border-gray-200'
       }`}
-      style={{ width: '256px' }}
+      style={{ width: '256px', pointerEvents: 'auto' }}
     >
       {/* Target handle - cards can receive connections */}
       <Handle
@@ -52,17 +60,65 @@ export const CardNode = memo(({ data }: NodeProps<CardNodeData>) => {
         style={{ left: -8, top: '50%', transform: 'translateY(-50%)' }}
       />
 
-      {/* Image thumbnail */}
-      <div className="w-full flex justify-center" style={{ height: '126px', backgroundColor: '#f3f4f6' }}>
-        {imageUrl ? (
+      {/* Image thumbnail - Show complete scene (background + elements) if available, otherwise show card image */}
+      <div className="w-full flex justify-center relative" style={{ height: '126px', backgroundColor: '#f3f4f6' }}>
+        {backgroundImageUrl || sceneElements.length > 0 ? (
+          <div className="relative" style={{ width: `${thumbnailWidth}px`, height: `${thumbnailHeight}px` }}>
+            {/* Background image */}
+            {backgroundImageUrl ? (
+              <img
+                src={backgroundImageUrl}
+                alt={card.caption || 'Scene background'}
+                className="object-cover"
+                style={{ width: `${thumbnailWidth}px`, height: `${thumbnailHeight}px`, pointerEvents: 'none' }}
+                draggable={false}
+              />
+            ) : (
+              <div className="w-full h-full bg-gray-200" style={{ pointerEvents: 'none' }} />
+            )}
+            
+            {/* Scene elements overlaid on background */}
+            {sceneElements.map((element) => {
+              const elementUrl = elementImages[element.id];
+              if (!elementUrl) return null;
+
+              // Scale element dimensions to fit thumbnail (224x126)
+              // Elements are positioned as percentages (0-1), so we can use those directly
+              const elementWidth = element.width ? Math.min(element.width, thumbnailWidth * 0.8) : thumbnailWidth * 0.3;
+              const elementHeight = element.height ? Math.min(element.height, thumbnailHeight * 0.8) : thumbnailHeight * 0.3;
+
+              return (
+                <img
+                  key={element.id}
+                  src={elementUrl}
+                  alt="Scene element"
+                  className="absolute"
+                  style={{
+                    left: `${element.positionX * 100}%`,
+                    top: `${element.positionY * 100}%`,
+                    transform: 'translate(-50%, -50%)',
+                    width: `${elementWidth}px`,
+                    height: `${elementHeight}px`,
+                    zIndex: element.zIndex,
+                    maxWidth: `${thumbnailWidth}px`,
+                    maxHeight: `${thumbnailHeight}px`,
+                    pointerEvents: 'none',
+                  }}
+                  draggable={false}
+                />
+              );
+            })}
+          </div>
+        ) : imageUrl ? (
           <img
             src={imageUrl}
             alt={card.caption || 'Card image'}
             className="object-cover"
-            style={{ width: '224px', height: '126px' }}
+            style={{ width: '224px', height: '126px', pointerEvents: 'none' }}
+            draggable={false}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400 text-xs">
+          <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400 text-xs" style={{ pointerEvents: 'none' }}>
             No Image
           </div>
         )}

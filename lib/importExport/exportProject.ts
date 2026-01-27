@@ -5,11 +5,13 @@ type Project = AppSchema['projects'];
 type Card = AppSchema['cards'];
 type Choice = AppSchema['choices'];
 type Asset = AppSchema['assets'];
+type SceneElement = AppSchema['sceneElements'];
 
 export function exportProject(
   project: Project,
   cards: Card[],
   choices: Choice[],
+  sceneElements: SceneElement[],
   assets: Asset[]
 ): ExportedProjectV1 {
   return {
@@ -24,6 +26,7 @@ export function exportProject(
       id: card.id,
       caption: card.caption,
       assetId: card.assetId,
+      backgroundAssetId: card.backgroundAssetId,
       positionX: card.positionX,
       positionY: card.positionY,
     })),
@@ -33,6 +36,17 @@ export function exportProject(
       label: choice.label,
       targetCardId: choice.targetCardId,
       order: choice.order,
+    })),
+    sceneElements: sceneElements.map((element) => ({
+      id: element.id,
+      cardId: element.cardId,
+      assetId: element.assetId,
+      positionX: element.positionX,
+      positionY: element.positionY,
+      width: element.width,
+      height: element.height,
+      zIndex: element.zIndex,
+      targetCardId: element.targetCardId,
     })),
     assets: assets.map((asset) => ({
       id: asset.id,
@@ -50,9 +64,10 @@ export function downloadProject(
   project: Project,
   cards: Card[],
   choices: Choice[],
+  sceneElements: SceneElement[],
   assets: Asset[]
 ): void {
-  const exportData = exportProject(project, cards, choices, assets);
+  const exportData = exportProject(project, cards, choices, sceneElements, assets);
   const blob = new Blob([JSON.stringify(exportData, null, 2)], {
     type: 'application/json',
   });

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import type { AppSchema } from '@/instant/schema';
+import { stripHtml } from '@/lib/utils';
 
 type Card = AppSchema['cards'];
 type Choice = AppSchema['choices'];
@@ -144,7 +145,7 @@ export function PlayerStage({
             {imageUrl ? (
               <img
                 src={imageUrl}
-                alt={currentCard.caption || 'Card image'}
+                alt={stripHtml(currentCard.caption) || 'Card image'}
                 className="w-full h-full object-contain"
               />
             ) : (
@@ -158,13 +159,12 @@ export function PlayerStage({
 
       {/* Content Section - Caption and Buttons */}
       <div className="bg-white px-8 py-6 flex flex-col gap-6">
-        {/* Caption Text */}
+        {/* Caption Text (supports rich text: bold, italic, color) */}
         {currentCard.caption && (
-          <div className="w-full max-w-4xl mx-auto">
-            <p className="text-lg leading-relaxed text-gray-900">
-              {currentCard.caption}
-            </p>
-          </div>
+          <div
+            className="w-full max-w-4xl mx-auto text-lg leading-relaxed text-gray-900 [&_b]:font-bold [&_i]:italic"
+            dangerouslySetInnerHTML={{ __html: currentCard.caption }}
+          />
         )}
 
         {/* Choice Buttons - Side by side */}

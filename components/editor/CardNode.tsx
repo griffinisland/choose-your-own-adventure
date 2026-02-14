@@ -3,6 +3,7 @@
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import type { AppSchema } from '@/instant/schema';
+import { stripHtml } from '@/lib/utils';
 
 type Card = AppSchema['cards'];
 type Choice = AppSchema['choices'];
@@ -68,7 +69,7 @@ export const CardNode = memo(({ data }: NodeProps<CardNodeData>) => {
             {backgroundImageUrl ? (
               <img
                 src={backgroundImageUrl}
-                alt={card.caption || 'Scene background'}
+                alt={stripHtml(card.caption) || 'Scene background'}
                 className="object-cover"
                 style={{ width: `${thumbnailWidth}px`, height: `${thumbnailHeight}px`, pointerEvents: 'none' }}
                 draggable={false}
@@ -112,7 +113,7 @@ export const CardNode = memo(({ data }: NodeProps<CardNodeData>) => {
         ) : imageUrl ? (
           <img
             src={imageUrl}
-            alt={card.caption || 'Card image'}
+            alt={stripHtml(card.caption) || 'Card image'}
             className="object-cover"
             style={{ width: '224px', height: '126px', pointerEvents: 'none' }}
             draggable={false}
@@ -124,10 +125,10 @@ export const CardNode = memo(({ data }: NodeProps<CardNodeData>) => {
         )}
       </div>
 
-      {/* Caption - 3 lines max */}
+      {/* Caption - 3 lines max (supports rich text: bold, italic, color) */}
       <div className="px-3 py-2 min-h-[60px]">
-        <p
-          className="text-sm text-gray-800 leading-tight"
+        <div
+          className="text-sm text-gray-800 leading-tight [&_b]:font-bold [&_i]:italic"
           style={{
             display: '-webkit-box',
             WebkitLineClamp: 3,
@@ -135,9 +136,10 @@ export const CardNode = memo(({ data }: NodeProps<CardNodeData>) => {
             overflow: 'hidden',
             textOverflow: 'ellipsis',
           }}
-        >
-          {card.caption || 'Untitled Card'}
-        </p>
+          dangerouslySetInnerHTML={{
+            __html: card.caption || 'Untitled Card',
+          }}
+        />
       </div>
 
       {/* Choices */}

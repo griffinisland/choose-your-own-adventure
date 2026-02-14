@@ -19,6 +19,7 @@ import 'reactflow/dist/style.css';
 import { CardNode } from './CardNode';
 import { DeletableEdge } from './DeletableEdge';
 import type { AppSchema } from '@/instant/schema';
+import { stripHtml } from '@/lib/utils';
 
 type Card = AppSchema['cards'];
 type Choice = AppSchema['choices'];
@@ -88,7 +89,7 @@ function DragPreviewInner({
           {nodeData.imageUrl ? (
             <img
               src={nodeData.imageUrl}
-              alt={nodeData.card.caption || 'Card image'}
+              alt={stripHtml(nodeData.card.caption) || 'Card image'}
               className="object-cover"
               style={{ width: '224px', height: '126px' }}
             />
@@ -111,7 +112,7 @@ function DragPreviewInner({
               textOverflow: 'ellipsis',
             }}
           >
-            {nodeData.card.caption || 'Untitled Card'}
+            {stripHtml(nodeData.card.caption) || 'Untitled Card'}
           </p>
         </div>
 

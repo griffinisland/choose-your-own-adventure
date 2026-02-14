@@ -1,13 +1,43 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import type { AppSchema } from '@/instant/schema';
+import { stripHtml } from '@/lib/utils';
 
 type Card = AppSchema['cards'];
 type Choice = AppSchema['choices'];
 type SceneElement = AppSchema['sceneElements'];
 type Asset = AppSchema['assets'];
+
+/** Caption text colors with tooltip names (for rich text color picker) */
+const CAPTION_COLORS: { name: string; hex: string }[] = [
+  { name: 'Default', hex: '#4A4A4A' },
+  { name: 'Light Gray', hex: '#9CA3AF' },
+  { name: 'Soft Red', hex: '#E24A4A' },
+  { name: 'Watermelon Pink', hex: '#F26D7D' },
+  { name: 'Bubblegum Pink', hex: '#F4A3C0' },
+  { name: 'Tangerine', hex: '#F28C38' },
+  { name: 'Peach', hex: '#F6B38E' },
+  { name: 'Golden Yellow', hex: '#F2C94C' },
+  { name: 'Sunny Cream', hex: '#F7E7A1' },
+  { name: 'Apple Green', hex: '#6FCF97' },
+  { name: 'Mint', hex: '#9FE0C3' },
+  { name: 'Grass Green', hex: '#4CAF50' },
+  { name: 'Teal Green', hex: '#2FA4A9' },
+  { name: 'Sky Blue', hex: '#6EC1E4' },
+  { name: 'Soft Blue', hex: '#5DA9E9' },
+  { name: 'Denim Blue', hex: '#3F6FB5' },
+  { name: 'Deep Ocean', hex: '#2C5282' },
+  { name: 'Lavender', hex: '#B9A7E8' },
+  { name: 'Grape Purple', hex: '#8B6FCF' },
+  { name: 'Royal Purple', hex: '#6B4EFF' },
+  { name: 'Coral', hex: '#FF7A6E' },
+  { name: 'Turquoise', hex: '#3DDAD7' },
+  { name: 'Soft Brown', hex: '#8B5E3C' },
+  { name: 'Soft Indigo', hex: '#6B6FD8' },
+];
 
 interface InspectorProps {
   card: Card | null;
@@ -53,21 +83,78 @@ export function Inspector({
 }: InspectorProps) {
   const router = useRouter();
   const [caption, setCaption] = useState(card?.caption || '');
+  const captionEditableRef = useRef<HTMLDivElement>(null);
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
+  const colorPickerRef = useRef<HTMLDivElement>(null);
+  const colorButtonRef = useRef<HTMLButtonElement>(null);
+  const [colorPickerRect, setColorPickerRect] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
     setCaption(card?.caption || '');
   }, [card]);
 
-  const handleCaptionChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      const newCaption = e.target.value;
-      setCaption(newCaption);
-      if (card) {
-        onUpdateCard(card.id, { caption: newCaption });
+  // Sync contentEditable content only when switching cards (not on every caption update to avoid cursor jump)
+  useEffect(() => {
+    const el = captionEditableRef.current;
+    if (!el) return;
+    el.innerHTML = card?.caption ?? '';
+  }, [card?.id]);
+
+  const handleCaptionInput = useCallback(() => {
+    const el = captionEditableRef.current;
+    if (!el || !card) return;
+    const html = el.innerHTML;
+    setCaption(html);
+    onUpdateCard(card.id, { caption: html });
+  }, [card, onUpdateCard]);
+
+  const applyFormat = useCallback((command: string, value?: string) => {
+    document.execCommand(command, false, value ?? undefined);
+    captionEditableRef.current?.focus();
+    handleCaptionInput();
+  }, [handleCaptionInput]);
+
+  const applyColor = useCallback((hex: string) => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      document.execCommand('foreColor', false, hex);
+    } else {
+      const range = selection.getRangeAt(0);
+      const span = document.createElement('span');
+      span.style.color = hex;
+      try {
+        range.surroundContents(span);
+      } catch {
+        span.appendChild(range.extractContents());
+        range.insertNode(span);
       }
-    },
-    [card, onUpdateCard]
-  );
+      selection.removeAllRanges();
+    }
+    handleCaptionInput();
+    setColorPickerOpen(false);
+  }, [handleCaptionInput]);
+
+  // Position color picker when opened; close when clicking outside
+  useEffect(() => {
+    if (!colorPickerOpen || !colorButtonRef.current) return;
+    const rect = colorButtonRef.current.getBoundingClientRect();
+    const pickerHeight = 110; // ~4 rows of 16px tiles + gaps + padding
+    setColorPickerRect({
+      left: rect.left,
+      top: rect.top - pickerHeight - 4,
+    });
+  }, [colorPickerOpen]);
+
+  useEffect(() => {
+    if (!colorPickerOpen) return;
+    const onMouseDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (colorPickerRef.current?.contains(target) || colorButtonRef.current?.contains(target)) return;
+      setColorPickerOpen(false);
+    };
+    window.addEventListener('mousedown', onMouseDown);
+    return () => window.removeEventListener('mousedown', onMouseDown);
+  }, [colorPickerOpen]);
 
   const handleAddChoice = useCallback(() => {
     if (card) {
@@ -103,13 +190,74 @@ export function Inspector({
         <label htmlFor="cardCaption" className="block text-sm font-medium text-gray-700 mb-1">
           Caption
         </label>
-        <textarea
+        {/* Rich text toolbar — positioned above caption so color picker doesn't cover it */}
+        <div className="flex items-center gap-1 mb-1 flex-wrap">
+          <button
+            type="button"
+            onClick={() => applyFormat('bold')}
+            className="p-1.5 border border-gray-300 rounded hover:bg-gray-100 font-bold text-sm"
+            title="Bold"
+          >
+            B
+          </button>
+          <button
+            type="button"
+            onClick={() => applyFormat('italic')}
+            className="p-1.5 border border-gray-300 rounded hover:bg-gray-100 italic text-sm"
+            title="Italic"
+          >
+            I
+          </button>
+          <div className="relative">
+            <button
+              ref={colorButtonRef}
+              type="button"
+              onClick={() => setColorPickerOpen((v) => !v)}
+              className="p-1.5 border border-gray-300 rounded hover:bg-gray-100 text-sm flex items-center gap-0.5"
+              title="Text color"
+            >
+              <span className="inline-block w-4 h-4 rounded border border-gray-400" style={{ backgroundColor: '#4A4A4A' }} aria-hidden />
+              A
+            </button>
+            {colorPickerOpen && colorPickerRect && typeof document !== 'undefined' &&
+              createPortal(
+                <div
+                  ref={colorPickerRef}
+                  className="fixed z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg p-1 grid grid-cols-6 gap-0.5"
+                  style={{
+                    width: '108px',
+                    left: colorPickerRect.left,
+                    top: colorPickerRect.top,
+                  }}
+                >
+                  {CAPTION_COLORS.map(({ name, hex }) => (
+                    <button
+                      key={hex}
+                      type="button"
+                      title={name}
+                      className="w-4 h-4 min-w-[14px] min-h-[14px] rounded-sm border border-gray-200 hover:ring-2 hover:ring-blue-400 transition-shadow flex-shrink-0"
+                      style={{ backgroundColor: hex }}
+                      onClick={() => applyColor(hex)}
+                    />
+                  ))}
+                </div>,
+                document.body
+              )}
+          </div>
+        </div>
+        <div
+          ref={captionEditableRef}
           id="cardCaption"
-          value={caption}
-          onChange={handleCaptionChange}
-          rows={3}
-          className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+          contentEditable
+          suppressContentEditableWarning
+          onInput={handleCaptionInput}
+          className="w-full min-h-[72px] p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 outline-none"
+          style={{ minHeight: '72px' }}
+          data-placeholder="Enter caption..."
         />
+        <style>{`
+          [data-placeholder]:empty::before { content: attr(data-placeholder); color: #9ca3af; }
+        `}</style>
       </div>
 
       <div className="mb-4">
@@ -151,7 +299,7 @@ export function Inspector({
                 .filter((c) => c.id !== card.id)
                 .map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.caption || `Card ${c.id.slice(0, 4)}`}
+                    {stripHtml(c.caption) || `Card ${c.id.slice(0, 4)}`}
                   </option>
                 ))}
             </select>

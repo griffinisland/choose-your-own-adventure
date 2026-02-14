@@ -6,7 +6,7 @@ import { LayoutClient } from './layout-client';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'HyperCard Adventure Builder',
+  title: 'Adventure Builder 2.1',
   description: 'Build and play interactive visual novels',
 };
 

@@ -19,7 +19,7 @@ export function TopNav() {
       <div className="flex items-center gap-4">
         <Link href="/" className="text-xl font-bold text-gray-800 flex items-center gap-2">
           Adventure Builder
-          <span className="text-sm font-normal text-gray-500">v2.0</span>
+          <span className="text-sm font-normal text-gray-500">v2.1</span>
         </Link>
         {isPlayPage && (
           <Link

@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import type { AppSchema } from '@/instant/schema';
+import { stripHtml } from '@/lib/utils';
 
 type Card = AppSchema['cards'];
 
@@ -59,7 +60,7 @@ export function CardList({
                   {imageUrl ? (
                     <img
                       src={imageUrl}
-                      alt={card.caption || 'Card thumbnail'}
+                      alt={stripHtml(card.caption) || 'Card thumbnail'}
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         console.error('Failed to load card image:', imageUrl);
@@ -86,11 +87,11 @@ export function CardList({
                     )}
                   </div>
                   <p className="text-base font-medium text-gray-900 truncate">
-                    {card.caption || 'Untitled Card'}
+                    {stripHtml(card.caption) || 'Untitled Card'}
                   </p>
-                  {card.caption && card.caption.length > 60 && (
+                  {card.caption && stripHtml(card.caption).length > 60 && (
                     <p className="text-sm text-gray-500 mt-1 line-clamp-2">
-                      {card.caption}
+                      {stripHtml(card.caption)}
                     </p>
                   )}
                 </div>

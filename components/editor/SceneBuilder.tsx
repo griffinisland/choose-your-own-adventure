@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import type { AppSchema } from '@/instant/schema';
+import { stripHtml } from '@/lib/utils';
 import { db } from '@/lib/instantdb/client';
 import {
   createSceneElement,
@@ -755,7 +756,7 @@ export function SceneBuilder({
                                     .filter((c) => c.id !== card.id)
                                     .map((c) => (
                                       <option key={c.id} value={c.id}>
-                                        {c.caption || `Card ${c.id.slice(0, 4)}`}
+                                        {stripHtml(c.caption) || `Card ${c.id.slice(0, 4)}`}
                                       </option>
                                     ))}
                                 </select>
@@ -796,7 +797,7 @@ export function SceneBuilder({
                       {element.targetCardId && (
                         <div className="mt-2 pt-2 border-t border-gray-200">
                           <p className="text-xs text-gray-500">
-                            Linked to: {allCards.find(c => c.id === element.targetCardId)?.caption || 'Card'}
+                            Linked to: {stripHtml(allCards.find(c => c.id === element.targetCardId)?.caption ?? '') || 'Card'}
                           </p>
                         </div>
                       )}

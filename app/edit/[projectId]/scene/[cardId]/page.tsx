@@ -11,6 +11,7 @@ import { SceneBuilder } from '@/components/editor/SceneBuilder';
 import { updateCard, createAsset, updateAsset } from '@/lib/instantdb/mutations';
 import Link from 'next/link';
 import type { AppSchema } from '@/instant/schema';
+import { stripHtml } from '@/lib/utils';
 
 export default function SceneBuilderPage() {
   const params = useParams();
@@ -197,7 +198,7 @@ export default function SceneBuilderPage() {
               ← Back to Editor
             </Link>
             <h1 className="text-lg font-semibold text-gray-900">
-              Scene Builder: {card.caption || 'Untitled Card'}
+              Scene Builder: {stripHtml(card.caption) || 'Untitled Card'}
             </h1>
           </div>
           <button

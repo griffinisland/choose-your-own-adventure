@@ -1,9 +1,22 @@
 'use client';
 
-import { TopNav } from '@/components/TopNav';
+import React from 'react';
+import dynamic from 'next/dynamic';
 import { AuthProvider } from '@/lib/auth/authContext';
-import { InstantDBAuthInit } from '@/components/InstantDBAuthInit';
-import { MaterialIconsLoader } from '@/components/MaterialIconsLoader';
+
+// Load client-only components with ssr: false to avoid CJS/ESM or browser-API issues during static prerender
+const TopNav = dynamic(
+  () => import('@/components/TopNav').then((m) => m.TopNav),
+  { ssr: false }
+);
+const MaterialIconsLoader = dynamic(
+  () => import('@/components/MaterialIconsLoader').then((m) => m.MaterialIconsLoader),
+  { ssr: false }
+);
+const InstantDBAuthInit = dynamic(
+  () => import('@/components/InstantDBAuthInit').then((m) => m.InstantDBAuthInit),
+  { ssr: false }
+);
 
 export function LayoutClient({ children }: { children: React.ReactNode }) {
   // If InstantDB isn't configured at build time, the app will crash when initializing the client.
@@ -27,13 +40,11 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <>
+    <AuthProvider>
       <MaterialIconsLoader />
       <InstantDBAuthInit />
-      <AuthProvider>
-        <TopNav />
-        {children}
-      </AuthProvider>
-    </>
+      <TopNav />
+      {children}
+    </AuthProvider>
   );
 }

@@ -39,6 +39,22 @@ const CAPTION_COLORS: { name: string; hex: string }[] = [
   { name: 'Soft Indigo', hex: '#6B6FD8' },
 ];
 
+/** Caption font choices (Google Fonts); display name and CSS font-family value */
+const CAPTION_FONTS: { name: string; family: string }[] = [
+  { name: 'Default', family: 'inherit' },
+  { name: 'Roboto', family: '"Roboto", sans-serif' },
+  { name: 'Bevan', family: '"Bevan", serif' },
+  { name: 'Bree Serif', family: '"Bree Serif", serif' },
+  { name: 'Cherry Swash', family: '"Cherry Swash", cursive' },
+  { name: 'Comic Neue', family: '"Comic Neue", cursive' },
+  { name: 'Fredoka', family: '"Fredoka", sans-serif' },
+  { name: 'Gelasio', family: '"Gelasio", serif' },
+  { name: 'Markazi Text', family: '"Markazi Text", serif' },
+  { name: 'Merriweather', family: '"Merriweather", serif' },
+  { name: 'Nunito', family: '"Nunito", sans-serif' },
+  { name: 'Source Sans 3', family: '"Source Sans 3", sans-serif' },
+];
+
 interface InspectorProps {
   card: Card | null;
   allCards: Card[];
@@ -133,6 +149,42 @@ export function Inspector({
     handleCaptionInput();
     setColorPickerOpen(false);
   }, [handleCaptionInput]);
+
+  const applyFont = useCallback((fontFamily: string) => {
+    if (fontFamily === 'inherit') return;
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      document.execCommand('fontName', false, fontFamily);
+    } else {
+      const range = selection.getRangeAt(0);
+      const span = document.createElement('span');
+      span.style.fontFamily = fontFamily;
+      try {
+        range.surroundContents(span);
+      } catch {
+        span.appendChild(range.extractContents());
+        range.insertNode(span);
+      }
+      selection.removeAllRanges();
+    }
+    handleCaptionInput();
+  }, [handleCaptionInput]);
+
+  // Load Google Fonts for caption font picker (only in browser)
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const id = 'caption-google-fonts';
+    if (document.getElementById(id)) return;
+    const link = document.createElement('link');
+    link.id = id;
+    link.rel = 'stylesheet';
+    link.href =
+      'https://fonts.googleapis.com/css2?family=Bevan&family=Bree+Serif&family=Cherry+Swash&family=Comic+Neue&family=Fredoka&family=Gelasio&family=Markazi+Text&family=Merriweather&family=Nunito&family=Roboto&family=Source+Sans+3&display=swap';
+    document.head.appendChild(link);
+    return () => {
+      document.getElementById(id)?.remove();
+    };
+  }, []);
 
   // Position color picker when opened; close when clicking outside
   useEffect(() => {
@@ -244,6 +296,22 @@ export function Inspector({
                 document.body
               )}
           </div>
+          <select
+            title="Caption font"
+            className="flex-1 min-w-0 max-w-[140px] p-1.5 border border-gray-300 rounded text-sm bg-white"
+            defaultValue="inherit"
+            onChange={(e) => {
+              const family = CAPTION_FONTS[e.target.selectedIndex]?.family ?? 'inherit';
+              applyFont(family);
+              e.target.value = 'inherit';
+            }}
+          >
+            {CAPTION_FONTS.map(({ name, family }) => (
+              <option key={family} value={family} style={{ fontFamily: family }}>
+                {name}
+              </option>
+            ))}
+          </select>
         </div>
         <div
           ref={captionEditableRef}

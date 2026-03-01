@@ -6,7 +6,7 @@ import { LayoutClient } from './layout-client';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Adventure Builder 2.1',
+  title: 'Adventure Builder - Now with quizzes!',
   description: 'Build and play interactive visual novels',
 };
 

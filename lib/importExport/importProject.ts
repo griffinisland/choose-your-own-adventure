@@ -58,36 +58,34 @@ export async function importProject(
     const newCardId = cardIdMap.get(card.id)!;
     const remappedAssetId = remapId(card.assetId, assetIdMap);
     const remappedBackgroundAssetId = remapId(card.backgroundAssetId, assetIdMap);
+    const remappedCorrectAnswerAssetId = remapId(
+      (card as Card & { correctAnswerAssetId?: string | null }).correctAnswerAssetId,
+      assetIdMap
+    );
+    const remappedIncorrectAnswerAssetId = remapId(
+      (card as Card & { incorrectAnswerAssetId?: string | null }).incorrectAnswerAssetId,
+      assetIdMap
+    );
 
-    if (newCardId === initialCardId) {
-      txs.push(
-        db.tx.cards[newCardId].update({
-          projectId,
-          caption: card.caption,
-          assetId: remappedAssetId,
-          backgroundAssetId: remappedBackgroundAssetId,
-          positionX: card.positionX,
-          positionY: card.positionY,
-        })
-      );
-    } else {
-      txs.push(
-        db.tx.cards[newCardId].update({
-          projectId,
-          caption: card.caption,
-          assetId: remappedAssetId,
-          backgroundAssetId: remappedBackgroundAssetId,
-          positionX: card.positionX,
-          positionY: card.positionY,
-        })
-      );
-    }
+    txs.push(
+      db.tx.cards[newCardId].update({
+        projectId,
+        caption: card.caption,
+        assetId: remappedAssetId,
+        backgroundAssetId: remappedBackgroundAssetId,
+        correctAnswerAssetId: remappedCorrectAnswerAssetId ?? undefined,
+        incorrectAnswerAssetId: remappedIncorrectAnswerAssetId ?? undefined,
+        positionX: card.positionX,
+        positionY: card.positionY,
+      })
+    );
   }
 
   for (const choice of data.choices) {
     const newChoiceId = choiceIdMap.get(choice.id)!;
     const remappedCardId = remapId(choice.cardId, cardIdMap)!;
     const remappedTargetCardId = remapId(choice.targetCardId, cardIdMap);
+    const isCorrect = (choice as Choice & { isCorrect?: boolean }).isCorrect;
 
     txs.push(
       db.tx.choices[newChoiceId].update({
@@ -95,6 +93,7 @@ export async function importProject(
         label: choice.label,
         targetCardId: remappedTargetCardId,
         order: choice.order,
+        isCorrect: isCorrect ?? false,
       })
     );
   }
@@ -105,12 +104,27 @@ export async function importProject(
     cardIdMap
   );
 
+  let remappedQuizQuestionOrder: string | undefined;
+  if (data.project.quizQuestionOrder) {
+    try {
+      const order = JSON.parse(data.project.quizQuestionOrder) as string[];
+      remappedQuizQuestionOrder = JSON.stringify(
+        order.map((id) => cardIdMap.get(id) ?? id)
+      );
+    } catch {
+      remappedQuizQuestionOrder = data.project.quizQuestionOrder;
+    }
+  }
+
   txs.push(
     db.tx.projects[projectId].update({
       title: data.project.title,
       isPublished: data.project.isPublished,
       startCardId: remappedStartCardId,
       thumbnailCardId: remappedThumbnailCardId,
+      projectType: data.project.projectType,
+      quizQuestionOrder: remappedQuizQuestionOrder,
+      quizResultMessages: data.project.quizResultMessages,
       updatedAt: now,
     })
   );

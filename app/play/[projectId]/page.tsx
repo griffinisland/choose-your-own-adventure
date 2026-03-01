@@ -3,9 +3,11 @@
 import { useParams } from 'next/navigation';
 import { useProject } from '@/lib/instantdb/queries';
 import { PlayerStage } from '@/components/PlayerStage';
+import { QuizPlayer } from '@/components/QuizPlayer';
 import { useMemo } from 'react';
 import { db } from '@/lib/instantdb/client';
-import type { AppSchema } from '@/instant/schema';
+import { getFileUrl } from '@/lib/instantdb/storageUrl';
+import type { AppSchema, QuizResultMessage } from '@/instant/schema';
 
 type Asset = AppSchema['assets'];
 
@@ -33,19 +35,6 @@ export default function PlayPage() {
     return map;
   }, [filesData]);
 
-  const isValidInstantDbUrl = (url: string | undefined | null): boolean => {
-    if (!url) return false;
-    return url.includes('instant-storage.s3.amazonaws.com');
-  };
-
-  const getFileUrl = (file: any): string | null => {
-    if (!file) return null;
-    if (file.url && isValidInstantDbUrl(file.url)) return file.url;
-    if (file.src && isValidInstantDbUrl(file.src)) return file.src;
-    if (file.downloadUrl && isValidInstantDbUrl(file.downloadUrl)) return file.downloadUrl;
-    return null;
-  };
-
   const cardImages = useMemo(() => {
     const imageMap: Record<string, string> = {};
     cards.forEach((card) => {
@@ -53,7 +42,7 @@ export default function PlayPage() {
         const asset = assets.find((a) => a.id === card.assetId);
         if (asset?.storageKey) {
           const file = fileMap.get(asset.storageKey);
-          const url = getFileUrl(file);
+          const url = getFileUrl(file, asset.storageKey, asset.url);
           if (url) {
             imageMap[card.id] = url;
           }
@@ -70,7 +59,7 @@ export default function PlayPage() {
         const asset = assets.find((a) => a.id === card.backgroundAssetId);
         if (asset?.storageKey) {
           const file = fileMap.get(asset.storageKey);
-          const url = getFileUrl(file);
+          const url = getFileUrl(file, asset.storageKey, asset.url);
           if (url) {
             imageMap[card.id] = url;
           }
@@ -86,7 +75,7 @@ export default function PlayPage() {
       const asset = assets.find((a) => a.id === element.assetId);
       if (asset?.storageKey) {
         const file = fileMap.get(asset.storageKey);
-        const url = getFileUrl(file);
+        const url = getFileUrl(file, asset.storageKey, asset.url);
         if (url) {
           imageMap[element.id] = url;
         }
@@ -94,6 +83,65 @@ export default function PlayPage() {
     });
     return imageMap;
   }, [sceneElements, assets, fileMap]);
+
+  // Quiz: ordered cards, feedback images, result messages
+  const quizOrderedCards = useMemo(() => {
+    if (project?.projectType !== 'quiz') return [];
+    const orderJson = project.quizQuestionOrder ?? '[]';
+    let order: string[] = [];
+    try {
+      order = JSON.parse(orderJson) as string[];
+    } catch {
+      return [];
+    }
+    return order
+      .map((id) => cards.find((c) => c.id === id))
+      .filter((c): c is NonNullable<typeof c> => c != null);
+  }, [project?.projectType, project?.quizQuestionOrder, cards]);
+
+  const correctAnswerImages = useMemo(() => {
+    const imageMap: Record<string, string> = {};
+    cards.forEach((card) => {
+      const aid = card.correctAnswerAssetId;
+      if (aid) {
+        const asset = assets.find((a) => a.id === aid);
+        if (asset?.storageKey) {
+          const file = fileMap.get(asset.storageKey);
+          const url = getFileUrl(file, asset.storageKey, asset.url);
+          if (url) imageMap[card.id] = url;
+        }
+      }
+    });
+    return imageMap;
+  }, [cards, assets, fileMap]);
+
+  const incorrectAnswerImages = useMemo(() => {
+    const imageMap: Record<string, string> = {};
+    cards.forEach((card) => {
+      const aid = card.incorrectAnswerAssetId;
+      if (aid) {
+        const asset = assets.find((a) => a.id === aid);
+        if (asset?.storageKey) {
+          const file = fileMap.get(asset.storageKey);
+          const url = getFileUrl(file, asset.storageKey, asset.url);
+          if (url) imageMap[card.id] = url;
+        }
+      }
+    });
+    return imageMap;
+  }, [cards, assets, fileMap]);
+
+  const quizResultMessages = useMemo((): QuizResultMessage[] => {
+    const raw = (project as { quizResultMessages?: string })?.quizResultMessages;
+    if (!raw) return [];
+    try {
+      return JSON.parse(raw) as QuizResultMessage[];
+    } catch {
+      return [];
+    }
+  }, [project]);
+
+  const isQuiz = project?.projectType === 'quiz';
 
   if (isLoading) {
     return (
@@ -137,6 +185,21 @@ export default function PlayPage() {
           </p>
         </div>
       </div>
+    );
+  }
+
+  if (isQuiz) {
+    return (
+      <QuizPlayer
+        orderedCards={quizOrderedCards as AppSchema['cards'][]}
+        choices={choices.filter((ch) =>
+          cards.some((c) => c.id === ch.cardId)
+        ) as AppSchema['choices'][]}
+        cardImages={cardImages}
+        correctAnswerImages={correctAnswerImages}
+        incorrectAnswerImages={incorrectAnswerImages}
+        resultMessages={quizResultMessages}
+      />
     );
   }
 

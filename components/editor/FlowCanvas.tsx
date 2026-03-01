@@ -38,6 +38,8 @@ interface FlowCanvasProps {
   onNodeClick: (cardId: string) => void;
   onDeleteEdge?: (choiceId: string) => void;
   selectedCardId: string | null;
+  /** When true, connection handles and edges are hidden and connecting is disabled (e.g. for quiz). */
+  connectionDisabled?: boolean;
 }
 
 // Define nodeTypes and edgeTypes outside component to prevent recreation on each render
@@ -157,6 +159,7 @@ export function FlowCanvas({
   onNodeClick,
   onDeleteEdge,
   selectedCardId,
+  connectionDisabled = false,
 }: FlowCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
@@ -193,10 +196,11 @@ export function FlowCanvas({
             elementImages,
             choices,
             isSelected: card.id === selectedCardId,
+            connectionDisabled,
           },
         };
       }),
-    [cards, cardImages, backgroundImages, sceneElements, elementImages, choices, selectedCardId]
+    [cards, cardImages, backgroundImages, sceneElements, elementImages, choices, selectedCardId, connectionDisabled]
   );
 
   const handleEdgeDelete = useCallback(
@@ -210,9 +214,11 @@ export function FlowCanvas({
 
   const initialEdges: Edge[] = useMemo(
     () =>
-      choices
-        .filter((choice) => choice.targetCardId)
-        .map((choice) => ({
+      connectionDisabled
+        ? []
+        : choices
+            .filter((choice) => choice.targetCardId)
+            .map((choice) => ({
           id: choice.id,
           type: 'deletable',
           source: choice.cardId,
@@ -231,7 +237,7 @@ export function FlowCanvas({
             onDelete: handleEdgeDelete,
           },
         })),
-    [choices, handleEdgeDelete]
+    [choices, handleEdgeDelete, connectionDisabled]
   );
 
   const handleNodeDragStart = useCallback((event: React.MouseEvent, node: Node) => {
@@ -287,6 +293,7 @@ export function FlowCanvas({
 
   const handleConnect = useCallback(
     (connection: Connection) => {
+      if (connectionDisabled) return;
       if (connection.source && connection.target) {
         // Extract choiceId from sourceHandle if it's a choice connection
         const choiceId = connection.sourceHandle?.startsWith('choice-')
@@ -296,7 +303,7 @@ export function FlowCanvas({
         onConnect(connection.source, connection.target, choiceId);
       }
     },
-    [onConnect]
+    [onConnect, connectionDisabled]
   );
 
   const handleNodeClick = useCallback(
@@ -351,6 +358,7 @@ export function FlowCanvas({
         draggedNode={draggedNode}
         dragPosition={dragPosition}
         choices={choices}
+        connectionDisabled={connectionDisabled}
       />
     </div>
   );
@@ -394,6 +402,7 @@ function ReactFlowWithZoomLock({
   draggedNode,
   dragPosition,
   choices,
+  connectionDisabled = false,
 }: {
   nodes: Node[];
   edges: Edge[];
@@ -405,6 +414,7 @@ function ReactFlowWithZoomLock({
   draggedNode: Node | null;
   dragPosition: { x: number; y: number } | null;
   choices: Choice[];
+  connectionDisabled?: boolean;
 }) {
   return (
     <ReactFlow
@@ -423,7 +433,7 @@ function ReactFlowWithZoomLock({
         markerEnd: { type: MarkerType.ArrowClosed, color: '#1083C0' },
       }}
       nodesDraggable={true}
-      nodesConnectable={true}
+      nodesConnectable={!connectionDisabled}
       elementsSelectable={true}
       selectNodesOnDrag={false}
       minZoom={0.5}

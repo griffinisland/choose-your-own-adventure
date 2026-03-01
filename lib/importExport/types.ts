@@ -7,6 +7,9 @@ export interface ExportedProjectV1 {
     isPublished: boolean;
     startCardId: string | null;
     thumbnailCardId: string | null;
+    projectType?: 'adventure' | 'quiz';
+    quizQuestionOrder?: string;
+    quizResultMessages?: string;
   };
   cards: Array<
     Omit<AppSchema['cards'], 'projectId' | 'assetId' | 'backgroundAssetId'> & {

@@ -12,17 +12,18 @@ export async function createProject(
   title: string
 ): Promise<{ projectId: string; cardId: string }> {
   const now = Date.now();
-  
   const projectId = id();
   const cardId = id();
-  
   await db.transact([
     db.tx.projects[projectId].update({
       ownerId,
       title,
       isPublished: true,
+      projectType: 'adventure',
       startCardId: cardId,
       thumbnailCardId: cardId,
+      quizQuestionOrder: '[]',
+      quizResultMessages: '[]',
       createdAt: now,
       updatedAt: now,
     }),
@@ -30,11 +31,47 @@ export async function createProject(
       projectId,
       caption: 'Start',
       assetId: null,
+      backgroundAssetId: null,
       positionX: 250,
       positionY: 250,
     }),
   ]);
+  return { projectId, cardId };
+}
 
+export async function createQuiz(
+  ownerId: string,
+  title: string
+): Promise<{ projectId: string; cardId: string }> {
+  const now = Date.now();
+  const projectId = id();
+  const cardId = id();
+  await db.transact([
+    db.tx.projects[projectId].update({
+      ownerId,
+      title,
+      isPublished: true,
+      projectType: 'quiz',
+      startCardId: cardId,
+      thumbnailCardId: cardId,
+      quizQuestionOrder: JSON.stringify([cardId]),
+      quizResultMessages: JSON.stringify([
+        { minPercent: 0, maxPercent: 49, message: 'Keep practicing!' },
+        { minPercent: 50, maxPercent: 89, message: 'Good job!' },
+        { minPercent: 90, maxPercent: 100, message: 'Excellent!' },
+      ]),
+      createdAt: now,
+      updatedAt: now,
+    }),
+    db.tx.cards[cardId].update({
+      projectId,
+      caption: 'Question 1',
+      assetId: null,
+      backgroundAssetId: null,
+      positionX: 250,
+      positionY: 250,
+    }),
+  ]);
   return { projectId, cardId };
 }
 
@@ -145,6 +182,60 @@ export async function createCard(
   return cardId;
 }
 
+/** Append a card id to a quiz's question order (call after createCard for quiz projects). */
+export async function appendQuizQuestionOrder(
+  projectId: string,
+  currentOrderJson: string,
+  newCardId: string
+) {
+  let order: string[] = [];
+  try {
+    order = JSON.parse(currentOrderJson || '[]');
+  } catch {
+    order = [];
+  }
+  if (!order.includes(newCardId)) {
+    order.push(newCardId);
+    await updateProject(projectId, { quizQuestionOrder: JSON.stringify(order) });
+  }
+}
+
+/**
+ * Create a quiz question card and append it to quizQuestionOrder in a single transaction.
+ * Use this instead of createCard + appendQuizQuestionOrder to avoid transaction timeouts.
+ */
+export async function createQuizCard(
+  projectId: string,
+  positionX: number,
+  positionY: number,
+  currentOrderJson: string
+): Promise<string> {
+  const cardId = id();
+  let order: string[] = [];
+  try {
+    order = JSON.parse(currentOrderJson || '[]');
+  } catch {
+    order = [];
+  }
+  order.push(cardId);
+  const now = Date.now();
+  await db.transact([
+    db.tx.cards[cardId].update({
+      projectId,
+      caption: 'New Card',
+      assetId: null,
+      backgroundAssetId: null,
+      positionX,
+      positionY,
+    }),
+    db.tx.projects[projectId].update({
+      quizQuestionOrder: JSON.stringify(order),
+      updatedAt: now,
+    }),
+  ]);
+  return cardId;
+}
+
 export async function duplicateCard(
   cardId: string,
   projectId: string
@@ -179,6 +270,8 @@ export async function duplicateCard(
       caption: originalCard.caption || 'New Card',
       assetId: originalCard.assetId,
       backgroundAssetId: originalCard.backgroundAssetId,
+      correctAnswerAssetId: (originalCard as Card).correctAnswerAssetId ?? null,
+      incorrectAnswerAssetId: (originalCard as Card).incorrectAnswerAssetId ?? null,
       positionX: originalCard.positionX + offsetX,
       positionY: originalCard.positionY + offsetY,
     })
@@ -199,11 +292,33 @@ export async function duplicateCard(
           zIndex: element.zIndex,
           width: element.width,
           height: element.height,
-          targetCardId: null, // Don't copy links to other cards
+          targetCardId: null,
         })
       );
     });
     await db.transact(sceneElementTx);
+  }
+
+  // Copy choices with isCorrect for quizzes
+  const { data: choicesData } = await db.queryOnce({
+    choices: { $: { where: { cardId } } },
+  });
+  const originalChoices = choicesData?.choices || [];
+  if (originalChoices.length > 0) {
+    const choiceTx: any[] = [];
+    originalChoices.forEach((ch) => {
+      const newChoiceId = id();
+      choiceTx.push(
+        db.tx.choices[newChoiceId].update({
+          cardId: newCardId,
+          label: ch.label,
+          targetCardId: null,
+          order: ch.order,
+          isCorrect: (ch as Choice).isCorrect ?? false,
+        })
+      );
+    });
+    await db.transact(choiceTx);
   }
 
   return newCardId;
@@ -260,7 +375,8 @@ export async function createChoice(
   cardId: string,
   label: string,
   targetCardId: string | null,
-  order: number
+  order: number,
+  isCorrect?: boolean
 ): Promise<string> {
   const choiceId = id();
   await db.transact(
@@ -269,6 +385,7 @@ export async function createChoice(
       label,
       targetCardId,
       order,
+      isCorrect: isCorrect ?? false,
     })
   );
   return choiceId;

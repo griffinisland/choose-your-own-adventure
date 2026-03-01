@@ -17,13 +17,16 @@ import {
   createAsset,
   updateAsset,
   createCard,
+  createQuizCard,
   duplicateCard,
+  appendQuizQuestionOrder,
 } from '@/lib/instantdb/mutations';
 import { FlowCanvas } from '@/components/editor/FlowCanvas';
 import { Inspector } from '@/components/editor/Inspector';
 import { downloadProject } from '@/lib/importExport/exportProject';
 import { EditableTitle } from '@/components/EditableTitle';
 import Link from 'next/link';
+import { getFileUrl } from '@/lib/instantdb/storageUrl';
 import type { AppSchema } from '@/instant/schema';
 
 type Asset = AppSchema['assets'];
@@ -55,19 +58,6 @@ export default function EditPage() {
     return map;
   }, [filesData]);
 
-  const isValidInstantDbUrl = (url: string | undefined | null): boolean => {
-    if (!url) return false;
-    return url.includes('instant-storage.s3.amazonaws.com');
-  };
-
-  const getFileUrl = (file: any): string | null => {
-    if (!file) return null;
-    if (file.url && isValidInstantDbUrl(file.url)) return file.url;
-    if (file.src && isValidInstantDbUrl(file.src)) return file.src;
-    if (file.downloadUrl && isValidInstantDbUrl(file.downloadUrl)) return file.downloadUrl;
-    return null;
-  };
-
   const cardImages = useMemo(() => {
     const imageMap: Record<string, string> = {};
     (cards || []).forEach((card) => {
@@ -75,7 +65,7 @@ export default function EditPage() {
         const asset = (assets || []).find((a) => a.id === card.assetId);
         if (asset?.storageKey) {
           const file = fileMap.get(asset.storageKey);
-          const url = getFileUrl(file);
+          const url = getFileUrl(file, asset.storageKey, asset.url);
           if (url) {
             imageMap[card.id] = url;
           }
@@ -101,7 +91,7 @@ export default function EditPage() {
         const asset = (assets || []).find((a) => a.id === assetId);
         if (asset?.storageKey) {
           const file = fileMap.get(asset.storageKey);
-          const url = getFileUrl(file);
+          const url = getFileUrl(file, asset.storageKey, asset.url);
           if (url) {
             imageMap[card.id] = url;
           }
@@ -118,7 +108,7 @@ export default function EditPage() {
       const asset = (assets || []).find((a) => a.id === element.assetId);
       if (asset?.storageKey) {
         const file = fileMap.get(asset.storageKey);
-        const url = getFileUrl(file);
+        const url = getFileUrl(file, asset.storageKey, asset.url);
         if (url) {
           imageMap[element.id] = url;
         }
@@ -126,6 +116,38 @@ export default function EditPage() {
     });
     return imageMap;
   }, [sceneElements, assets, fileMap]);
+
+  // Correct/incorrect answer images for quiz cards
+  const correctAnswerImages = useMemo(() => {
+    const imageMap: Record<string, string> = {};
+    (cards || []).forEach((card) => {
+      const aid = (card as AppSchema['cards']).correctAnswerAssetId;
+      if (aid) {
+        const asset = (assets || []).find((a) => a.id === aid);
+        if (asset?.storageKey) {
+          const file = fileMap.get(asset.storageKey);
+          const url = getFileUrl(file, asset.storageKey, asset.url);
+          if (url) imageMap[card.id] = url;
+        }
+      }
+    });
+    return imageMap;
+  }, [cards, assets, fileMap]);
+  const incorrectAnswerImages = useMemo(() => {
+    const imageMap: Record<string, string> = {};
+    (cards || []).forEach((card) => {
+      const aid = (card as AppSchema['cards']).incorrectAnswerAssetId;
+      if (aid) {
+        const asset = (assets || []).find((a) => a.id === aid);
+        if (asset?.storageKey) {
+          const file = fileMap.get(asset.storageKey);
+          const url = getFileUrl(file, asset.storageKey, asset.url);
+          if (url) imageMap[card.id] = url;
+        }
+      }
+    });
+    return imageMap;
+  }, [cards, assets, fileMap]);
 
   const selectedCard = (cards || []).find((c) => c.id === selectedCardId) || null;
   const isStartCard = project?.startCardId === selectedCardId;
@@ -211,6 +233,66 @@ export default function EditPage() {
   );
 
 
+  const handleUploadCorrectAnswerImage = useCallback(
+    async (cardId: string, file: File) => {
+      try {
+        const timestamp = Date.now();
+        const storageKey = `projects/${projectId}/cards/${cardId}/correct_${timestamp}_${file.name}`;
+        await db.storage.uploadFile(storageKey, file);
+        const url = '';
+        const currentCard = (cards || []).find((c) => c.id === cardId) as AppSchema['cards'] | undefined;
+        if (currentCard?.correctAnswerAssetId) {
+          await updateAsset(currentCard.correctAnswerAssetId, {
+            storageKey,
+            url,
+            contentType: file.type || undefined,
+            bytes: file.size || undefined,
+          });
+        } else {
+          const assetId = await createAsset(projectId, storageKey, url, {
+            contentType: file.type || undefined,
+            bytes: file.size || undefined,
+          });
+          await updateCard(cardId, { correctAnswerAssetId: assetId });
+        }
+      } catch (error) {
+        console.error('Failed to upload correct answer image:', error);
+        alert('Failed to upload image. Please try again.');
+      }
+    },
+    [projectId, cards]
+  );
+
+  const handleUploadIncorrectAnswerImage = useCallback(
+    async (cardId: string, file: File) => {
+      try {
+        const timestamp = Date.now();
+        const storageKey = `projects/${projectId}/cards/${cardId}/incorrect_${timestamp}_${file.name}`;
+        await db.storage.uploadFile(storageKey, file);
+        const url = '';
+        const currentCard = (cards || []).find((c) => c.id === cardId) as AppSchema['cards'] | undefined;
+        if (currentCard?.incorrectAnswerAssetId) {
+          await updateAsset(currentCard.incorrectAnswerAssetId, {
+            storageKey,
+            url,
+            contentType: file.type || undefined,
+            bytes: file.size || undefined,
+          });
+        } else {
+          const assetId = await createAsset(projectId, storageKey, url, {
+            contentType: file.type || undefined,
+            bytes: file.size || undefined,
+          });
+          await updateCard(cardId, { incorrectAnswerAssetId: assetId });
+        }
+      } catch (error) {
+        console.error('Failed to upload incorrect answer image:', error);
+        alert('Failed to upload image. Please try again.');
+      }
+    },
+    [projectId, cards]
+  );
+
   const handleExport = useCallback(() => {
     if (!project) return;
     downloadProject(
@@ -255,6 +337,14 @@ export default function EditPage() {
 
       try {
         await deleteCard(cardId, projectId);
+        if (project?.projectType === 'quiz' && project.quizQuestionOrder) {
+          let order: string[] = [];
+          try {
+            order = JSON.parse(project.quizQuestionOrder);
+          } catch {}
+          const next = order.filter((id) => id !== cardId);
+          await updateProject(projectId, { quizQuestionOrder: JSON.stringify(next) });
+        }
         if (selectedCardId === cardId) {
           setSelectedCardId(null);
         }
@@ -263,7 +353,7 @@ export default function EditPage() {
         alert('Failed to delete card. Please try again.');
       }
     },
-    [projectId, selectedCardId]
+    [projectId, project, selectedCardId]
   );
 
   const handleUpdateProjectTitle = useCallback(
@@ -275,32 +365,44 @@ export default function EditPage() {
 
   const handleAddCard = useCallback(async () => {
     try {
-      const cardCount = (cards || []).length;
-      // Position new card to the right of existing cards
-      // Calculate max X position and add 300px spacing
       const maxX = cards && cards.length > 0
         ? Math.max(...cards.map((c) => c.positionX))
         : 0;
       const newX = maxX + 300;
-      const newCardId = await createCard(projectId, newX, 0);
+      const newCardId =
+        project?.projectType === 'quiz'
+          ? await createQuizCard(
+              projectId,
+              newX,
+              0,
+              project.quizQuestionOrder ?? '[]'
+            )
+          : await createCard(projectId, newX, 0);
       setSelectedCardId(newCardId);
     } catch (error) {
       console.error('Failed to create card:', error);
       alert('Failed to create card. Please try again.');
     }
-  }, [projectId, cards]);
+  }, [projectId, project, cards]);
 
   const handleDuplicateCard = useCallback(
     async (cardId: string) => {
       try {
         const newCardId = await duplicateCard(cardId, projectId);
+        if (project?.projectType === 'quiz') {
+          await appendQuizQuestionOrder(
+            projectId,
+            project.quizQuestionOrder ?? '[]',
+            newCardId
+          );
+        }
         setSelectedCardId(newCardId);
       } catch (error) {
         console.error('Failed to duplicate card:', error);
         alert('Failed to duplicate card. Please try again.');
       }
     },
-    [projectId]
+    [projectId, project]
   );
 
   const handleNodeDragStop = useCallback(
@@ -411,7 +513,7 @@ export default function EditPage() {
             onClick={handleAddCard}
             className="ml-4 px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors"
           >
-            Add Card
+            {project?.projectType === 'quiz' ? 'Add Question' : 'Add Card'}
           </button>
         </div>
         <div className="flex items-center gap-2">
@@ -456,6 +558,7 @@ export default function EditPage() {
             onNodeClick={setSelectedCardId}
             onDeleteEdge={handleDeleteEdge}
             selectedCardId={selectedCardId}
+            connectionDisabled={project?.projectType === 'quiz'}
           />
         </div>
 
@@ -469,6 +572,11 @@ export default function EditPage() {
           backgroundImageUrl={selectedCard ? backgroundImages[selectedCard.id] || null : null}
           elementImageUrls={elementImages}
           projectId={projectId}
+          projectType={project.projectType === 'quiz' ? 'quiz' : 'adventure'}
+          quizQuestionOrder={project.quizQuestionOrder ?? '[]'}
+          quizResultMessages={project.quizResultMessages ?? '[]'}
+          correctAnswerImageUrl={selectedCard ? correctAnswerImages[selectedCard.id] ?? null : null}
+          incorrectAnswerImageUrl={selectedCard ? incorrectAnswerImages[selectedCard.id] ?? null : null}
           onUpdateCard={handleUpdateCard}
           onUpdateChoice={handleUpdateChoice}
           onCreateChoice={handleCreateChoice}
@@ -476,6 +584,9 @@ export default function EditPage() {
           onSetStartCard={handleSetStartCard}
           onDuplicateCard={handleDuplicateCard}
           onDeleteCard={handleDeleteCard}
+          onUpdateProject={updateProject}
+          onUploadCorrectAnswerImage={handleUploadCorrectAnswerImage}
+          onUploadIncorrectAnswerImage={handleUploadIncorrectAnswerImage}
           isStartCard={isStartCard}
         />
       </div>

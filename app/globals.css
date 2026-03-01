@@ -3,6 +3,16 @@
 @tailwind utilities;
 
 /* React Flow overrides */
+.react-flow__pane {
+  left: 504px;
+  top: 51px;
+}
+
+.react-flow__renderer {
+  left: -191px;
+  top: 18px;
+}
+
 .react-flow__node {
   border-radius: 8px;
   font-size: 12px;

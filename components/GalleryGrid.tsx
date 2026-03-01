@@ -6,6 +6,7 @@ import { useState, useRef, ChangeEvent, KeyboardEvent } from 'react';
 import { usePublishedProjects } from '@/lib/instantdb/queries';
 import { db } from '@/lib/instantdb/client';
 import { updateProject, deleteProject, createAsset, createCard, updateCard, updateAsset, deleteAsset } from '@/lib/instantdb/mutations';
+import { getFileUrl } from '@/lib/instantdb/storageUrl';
 import { useAuth } from '@/lib/auth/authContext';
 import { canEditProject } from '@/lib/auth/utils';
 import type { AppSchema } from '@/instant/schema';
@@ -18,83 +19,14 @@ type Asset = AppSchema['assets'];
 const THUMBNAIL_MAX_SIZE = 500 * 1024; // 500KB
 const THUMBNAIL_ACCEPTED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 
-// Helper to get URL from InstantDB $files object
-// InstantDB files have: id, path, content-type, location-id, etc.
-// The download URL needs to be constructed
-function getFileUrl(file: any, appId: string | undefined): string | null {
-  if (!file || !appId) return null;
-  
-  // Check if file has a direct URL field
-  if (file.url) return file.url;
-  if (file.src) return file.src;
-  if (file.downloadUrl) return file.downloadUrl;
-  
-  // Construct URL from file path
-  // InstantDB storage URL format: https://storage.instantdb.com/{appId}/{path}
-  const filePath = file.path || file.key;
-  if (filePath) {
-    return `https://storage.instantdb.com/${appId}/${filePath}`;
-  }
-  
-  return null;
-}
-
-// Helper to construct InstantDB storage URL from storage key
-function getStorageUrl(storageKey: string): string | null {
-  if (!storageKey) return null;
-  
-  const appId = process.env.NEXT_PUBLIC_INSTANT_APP_ID;
-  if (!appId) {
-    console.warn('NEXT_PUBLIC_INSTANT_APP_ID not set, cannot construct storage URL');
-    return null;
-  }
-  
-  // If storageKey already looks like a URL, return it
-  if (storageKey.startsWith('http://') || storageKey.startsWith('https://')) {
-    return storageKey;
-  }
-  
-  // Construct URL: https://storage.instantdb.com/{appId}/{path}
-  return `https://storage.instantdb.com/${appId}/${storageKey}`;
-}
-
 function getThumbnailUrl(
   project: Project,
   cards: Card[],
   assets: Asset[],
   fileMap: Map<string, any>
 ): string | null {
-  // Helper to check if a string is a valid InstantDB URL
-  // ONLY accept URLs from instant-storage.s3.amazonaws.com (the correct domain)
-  const isValidInstantDbUrl = (url: string | undefined | null): boolean => {
-    if (!url) return false;
-    return url.includes('instant-storage.s3.amazonaws.com');
-  };
-
-  // Helper to get URL from $files query (the ONLY reliable source)
-  const getUrlFromFileMap = (storageKey: string): string | null => {
-    if (!storageKey) return null;
-    const file = fileMap.get(storageKey);
-    if (!file) return null;
-    // Check file object for URL properties
-    if (file.url && isValidInstantDbUrl(file.url)) return file.url;
-    if (file.src && isValidInstantDbUrl(file.src)) return file.src;
-    if (file.downloadUrl && isValidInstantDbUrl(file.downloadUrl)) return file.downloadUrl;
-    return null;
-  };
-
-  // Helper to get URL for an asset - ALWAYS prefer fileMap over stored asset.url
-  const getAssetUrl = (asset: Asset): string | null => {
-    // First, try to get the URL from $files using storageKey (the CORRECT source)
-    const fileUrl = getUrlFromFileMap(asset.storageKey);
-    if (fileUrl) return fileUrl;
-    
-    // Only use asset.url if it's from the correct domain
-    // (old assets might have wrong domain stored)
-    if (isValidInstantDbUrl(asset.url)) return asset.url;
-    
-    return null;
-  };
+  const getAssetUrl = (asset: Asset): string | null =>
+    getFileUrl(fileMap.get(asset.storageKey), asset.storageKey, asset.url);
 
   // Strategy 1: Use thumbnailCardId if set
   if (project.thumbnailCardId) {
@@ -531,6 +463,11 @@ export function GalleryGrid() {
               thumbnailUrl={thumbnailUrl}
             />
             <div className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  {(project as Project).projectType === 'quiz' ? 'Quiz' : 'Adventure'}
+                </span>
+              </div>
               <EditableTitle
                 project={project}
                 isOwner={isOwner}

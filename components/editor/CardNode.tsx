@@ -17,10 +17,12 @@ interface CardNodeData {
   elementImages: Record<string, string>;
   choices: Choice[];
   isSelected: boolean;
+  /** When true, connection handles are hidden (e.g. for quiz projects). */
+  connectionDisabled?: boolean;
 }
 
 export const CardNode = memo(({ data }: NodeProps<CardNodeData>) => {
-  const { card, imageUrl, backgroundImageUrl, sceneElements, elementImages, choices, isSelected } = data;
+  const { card, imageUrl, backgroundImageUrl, sceneElements, elementImages, choices, isSelected, connectionDisabled } = data;
   
   // Thumbnail dimensions
   const thumbnailWidth = 224;
@@ -53,13 +55,15 @@ export const CardNode = memo(({ data }: NodeProps<CardNodeData>) => {
       }`}
       style={{ width: '256px', pointerEvents: 'auto' }}
     >
-      {/* Target handle - cards can receive connections */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        className="!w-4 !h-4 !bg-[#1083C0] !border-2 !border-white !rounded-full"
-        style={{ left: -8, top: '50%', transform: 'translateY(-50%)' }}
-      />
+      {/* Target handle - cards can receive connections (hidden for quizzes) */}
+      {!connectionDisabled && (
+        <Handle
+          type="target"
+          position={Position.Left}
+          className="!w-4 !h-4 !bg-[#1083C0] !border-2 !border-white !rounded-full"
+          style={{ left: -8, top: '50%', transform: 'translateY(-50%)' }}
+        />
+      )}
 
       {/* Image thumbnail - Show complete scene (background + elements) if available, otherwise show card image */}
       <div className="w-full flex justify-center relative" style={{ height: '126px', backgroundColor: '#f3f4f6' }}>
@@ -157,14 +161,16 @@ export const CardNode = memo(({ data }: NodeProps<CardNodeData>) => {
               >
                 {truncateChoice(choice.label || 'Choice')}
               </button>
-              {/* Connection handle for this choice */}
-              <Handle
-                type="source"
-                id={`choice-${choice.id}`}
-                position={Position.Right}
-                className="!w-4 !h-4 !bg-white !border-2 !border-gray-400 !rounded-full"
-                style={{ right: -8, top: '50%', transform: 'translateY(-50%)' }}
-              />
+              {/* Connection handle for this choice (hidden for quizzes) */}
+              {!connectionDisabled && (
+                <Handle
+                  type="source"
+                  id={`choice-${choice.id}`}
+                  position={Position.Right}
+                  className="!w-4 !h-4 !bg-white !border-2 !border-gray-400 !rounded-full"
+                  style={{ right: -8, top: '50%', transform: 'translateY(-50%)' }}
+                />
+              )}
             </div>
           ))}
         </div>

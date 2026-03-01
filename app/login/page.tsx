@@ -41,7 +41,7 @@ export default function LoginPage() {
             Adventure Builder
           </h1>
           <p className="text-sm text-center text-gray-500 mt-1">
-            v2.1
+            v2.2
           </p>
           <h2 className="mt-6 text-center text-xl font-medium text-gray-600">
             Sign in to your account

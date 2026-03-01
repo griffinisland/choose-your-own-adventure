@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
-import type { AppSchema } from '@/instant/schema';
+import type { AppSchema, QuizResultMessage } from '@/instant/schema';
 import { stripHtml } from '@/lib/utils';
 
 type Card = AppSchema['cards'];
@@ -76,7 +76,15 @@ interface InspectorProps {
   onSetStartCard: (cardId: string) => void;
   onDuplicateCard?: (cardId: string) => void;
   onDeleteCard?: (cardId: string) => void;
+  onUpdateProject?: (projectId: string, updates: Partial<AppSchema['projects']>) => Promise<void>;
+  onUploadCorrectAnswerImage?: (cardId: string, file: File) => Promise<void>;
+  onUploadIncorrectAnswerImage?: (cardId: string, file: File) => Promise<void>;
   isStartCard: boolean;
+  projectType?: 'adventure' | 'quiz';
+  quizQuestionOrder?: string;
+  quizResultMessages?: string;
+  correctAnswerImageUrl?: string | null;
+  incorrectAnswerImageUrl?: string | null;
 }
 
 export function Inspector({
@@ -95,7 +103,15 @@ export function Inspector({
   onSetStartCard,
   onDuplicateCard,
   onDeleteCard,
+  onUpdateProject,
+  onUploadCorrectAnswerImage,
+  onUploadIncorrectAnswerImage,
   isStartCard,
+  projectType = 'adventure',
+  quizQuestionOrder = '[]',
+  quizResultMessages = '[]',
+  correctAnswerImageUrl = null,
+  incorrectAnswerImageUrl = null,
 }: InspectorProps) {
   const router = useRouter();
   const [caption, setCaption] = useState(card?.caption || '');
@@ -104,6 +120,8 @@ export function Inspector({
   const colorPickerRef = useRef<HTMLDivElement>(null);
   const colorButtonRef = useRef<HTMLButtonElement>(null);
   const [colorPickerRect, setColorPickerRect] = useState<{ top: number; left: number } | null>(null);
+  const correctAnswerInputRef = useRef<HTMLInputElement>(null);
+  const incorrectAnswerInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setCaption(card?.caption || '');
@@ -235,12 +253,14 @@ export function Inspector({
 
   return (
     <div className="w-80 bg-white border-l border-gray-200 flex-shrink-0 flex flex-col" style={{ height: '100%' }}>
-      <h2 className="text-lg font-semibold p-4 pb-2">Card Inspector</h2>
+      <h2 className="text-lg font-semibold p-4 pb-2">
+        {projectType === 'quiz' ? 'Quiz Question Inspector' : 'Card Inspector'}
+      </h2>
 
       <div className="flex-1 overflow-y-auto p-4" style={{ minHeight: 0 }}>
       <div className="mb-4">
         <label htmlFor="cardCaption" className="block text-sm font-medium text-gray-700 mb-1">
-          Caption
+          {projectType === 'quiz' ? 'Question' : 'Caption'}
         </label>
         {/* Rich text toolbar — positioned above caption so color picker doesn't cover it */}
         <div className="flex items-center gap-1 mb-1 flex-wrap">
@@ -329,22 +349,7 @@ export function Inspector({
       </div>
 
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Scene Builder
-        </label>
-        <button
-          onClick={() => router.push(`/edit/${projectId}/scene/${card.id}`)}
-          className="w-full px-4 py-2 bg-purple-500 text-white text-sm rounded-md hover:bg-purple-600 transition-colors"
-        >
-          Enter Scene Builder
-        </button>
-        <p className="text-xs text-gray-500 mt-1">
-          Build interactive scenes with background images and clickable elements.
-        </p>
-      </div>
-
-      <div className="mb-4">
-        <h3 className="text-md font-medium text-gray-700 mb-2">Choices</h3>
+        <h3 className="text-md font-medium text-gray-700 mb-2">Answer choices</h3>
         {cardChoices.length === 0 && (
           <p className="text-sm text-gray-500 mb-2">No choices yet.</p>
         )}
@@ -357,20 +362,22 @@ export function Inspector({
               placeholder="Choice Label"
               className="flex-1 p-1 border border-gray-300 rounded-md text-sm"
             />
-            <select
-              value={choice.targetCardId || ''}
-              onChange={(e) => onUpdateChoice(choice.id, { targetCardId: e.target.value || null })}
-              className="p-1 border border-gray-300 rounded-md text-sm"
-            >
-              <option value="">None</option>
-              {allCards
-                .filter((c) => c.id !== card.id)
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {stripHtml(c.caption) || `Card ${c.id.slice(0, 4)}`}
-                  </option>
-                ))}
-            </select>
+            {projectType !== 'quiz' && (
+              <select
+                value={choice.targetCardId || ''}
+                onChange={(e) => onUpdateChoice(choice.id, { targetCardId: e.target.value || null })}
+                className="p-1 border border-gray-300 rounded-md text-sm"
+              >
+                <option value="">None</option>
+                {allCards
+                  .filter((c) => c.id !== card.id)
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {stripHtml(c.caption) || `Card ${c.id.slice(0, 4)}`}
+                    </option>
+                  ))}
+              </select>
+            )}
             <button
               onClick={() => onDeleteChoice(choice.id)}
               className="p-1 text-red-500 hover:text-red-700"
@@ -388,19 +395,222 @@ export function Inspector({
         </button>
       </div>
 
+      {projectType === 'quiz' && (
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Correct answer</label>
+          {cardChoices.length === 0 ? (
+            <p className="text-sm text-gray-500">Add choices below first.</p>
+          ) : (
+            <div className="space-y-1">
+              {cardChoices.map((ch) => (
+                <label key={ch.id} className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="correctChoice"
+                    checked={(ch as Choice & { isCorrect?: boolean }).isCorrect === true}
+                    onChange={() => {
+                      cardChoices.forEach((c) => {
+                        onUpdateChoice(c.id, { isCorrect: c.id === ch.id });
+                      });
+                    }}
+                    className="rounded"
+                  />
+                  <span className="text-sm">{ch.label || 'Choice'}</span>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Scene Builder
+        </label>
+        <button
+          onClick={() => router.push(`/edit/${projectId}/scene/${card.id}`)}
+          className="w-full px-4 py-2 bg-purple-500 text-white text-sm rounded-md hover:bg-purple-600 transition-colors"
+        >
+          Enter Scene Builder
+        </button>
+        <p className="text-xs text-gray-500 mt-1">
+          Build interactive scenes with background images and clickable elements.
+        </p>
+      </div>
+
+      {projectType === 'quiz' && (
+        <div className="mb-4 space-y-4">
+          {/* Correct/incorrect feedback images */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Feedback images (optional)</label>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <p className="text-xs text-gray-500 mb-1">When correct</p>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  ref={correctAnswerInputRef}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file && onUploadCorrectAnswerImage && card) onUploadCorrectAnswerImage(card.id, file);
+                    e.target.value = '';
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => correctAnswerInputRef.current?.click()}
+                  className="w-full border border-gray-300 rounded p-2 text-sm bg-white"
+                >
+                  {correctAnswerImageUrl ? 'Change image' : 'Upload image'}
+                </button>
+                {correctAnswerImageUrl && (
+                  <img src={correctAnswerImageUrl} alt="Correct" className="mt-1 h-16 object-cover rounded w-full" />
+                )}
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1">When incorrect</p>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  ref={incorrectAnswerInputRef}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file && onUploadIncorrectAnswerImage && card) onUploadIncorrectAnswerImage(card.id, file);
+                    e.target.value = '';
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => incorrectAnswerInputRef.current?.click()}
+                  className="w-full border border-gray-300 rounded p-2 text-sm bg-white"
+                >
+                  {incorrectAnswerImageUrl ? 'Change image' : 'Upload image'}
+                </button>
+                {incorrectAnswerImageUrl && (
+                  <img src={incorrectAnswerImageUrl} alt="Incorrect" className="mt-1 h-16 object-cover rounded w-full" />
+                )}
+              </div>
+            </div>
+          </div>
+          {/* Question order */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Question order</label>
+            {(() => {
+              let order: string[] = [];
+              try {
+                order = JSON.parse(quizQuestionOrder || '[]');
+              } catch {}
+              const move = (idx: number, delta: number) => {
+                const next = [...order];
+                const ni = idx + delta;
+                if (ni < 0 || ni >= next.length) return;
+                [next[idx], next[ni]] = [next[ni], next[idx]];
+                onUpdateProject?.(projectId, { quizQuestionOrder: JSON.stringify(next) });
+              };
+              return (
+                <ul className="space-y-1 text-sm">
+                  {order.map((cardId, idx) => {
+                    const c = allCards.find((x) => x.id === cardId);
+                    return (
+                      <li key={cardId} className="flex items-center gap-2 p-1 border border-gray-200 rounded">
+                        <span className="flex-1 truncate">{stripHtml(c?.caption ?? '') || cardId.slice(0, 8)}</span>
+                        <button type="button" onClick={() => move(idx, -1)} disabled={idx === 0} className="p-0.5 text-gray-600 disabled:opacity-40">↑</button>
+                        <button type="button" onClick={() => move(idx, 1)} disabled={idx === order.length - 1} className="p-0.5 text-gray-600 disabled:opacity-40">↓</button>
+                      </li>
+                    );
+                  })}
+                  {order.length === 0 && <p className="text-gray-500 text-xs">Add cards; they are added to the quiz order automatically.</p>}
+                </ul>
+              );
+            })()}
+          </div>
+          {/* Result messages */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Results messages (by % score)</label>
+            {(() => {
+              let messages: QuizResultMessage[] = [];
+              try {
+                messages = JSON.parse(quizResultMessages || '[]');
+              } catch {}
+              const update = (next: QuizResultMessage[]) => {
+                onUpdateProject?.(projectId, { quizResultMessages: JSON.stringify(next) });
+              };
+              return (
+                <div className="space-y-2">
+                  {messages.map((msg, idx) => (
+                    <div key={idx} className="flex gap-2 items-center flex-wrap p-2 border border-gray-200 rounded text-sm">
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={msg.minPercent}
+                        onChange={(e) => {
+                          const next = [...messages];
+                          next[idx] = { ...next[idx], minPercent: Number(e.target.value) };
+                          update(next);
+                        }}
+                        className="w-14 p-1 border rounded"
+                        placeholder="Min %"
+                      />
+                      <span>-</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={msg.maxPercent}
+                        onChange={(e) => {
+                          const next = [...messages];
+                          next[idx] = { ...next[idx], maxPercent: Number(e.target.value) };
+                          update(next);
+                        }}
+                        className="w-14 p-1 border rounded"
+                        placeholder="Max %"
+                      />
+                      <input
+                        type="text"
+                        value={msg.message}
+                        onChange={(e) => {
+                          const next = [...messages];
+                          next[idx] = { ...next[idx], message: e.target.value };
+                          update(next);
+                        }}
+                        className="flex-1 min-w-0 p-1 border rounded"
+                        placeholder="Message"
+                      />
+                      <button type="button" onClick={() => update(messages.filter((_, i) => i !== idx))} className="text-red-600 p-1">✕</button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => update([...messages, { minPercent: 0, maxPercent: 100, message: '' }])}
+                    className="text-sm text-blue-600"
+                  >
+                    + Add message
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
       <div className="mb-4">
         <h3 className="text-md font-medium text-gray-700 mb-2">Project Settings</h3>
-        <button
-          onClick={() => onSetStartCard(card.id)}
-          disabled={isStartCard}
-          className={`w-full mb-2 px-3 py-1.5 text-sm rounded-md transition-colors ${
-            isStartCard
-              ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
-              : 'bg-indigo-500 text-white hover:bg-indigo-600'
-          }`}
-        >
-          {isStartCard ? 'Start Card' : 'Set as Start Card'}
-        </button>
+        {projectType !== 'quiz' && (
+          <button
+            onClick={() => onSetStartCard(card.id)}
+            disabled={isStartCard}
+            className={`w-full mb-2 px-3 py-1.5 text-sm rounded-md transition-colors ${
+              isStartCard
+                ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                : 'bg-indigo-500 text-white hover:bg-indigo-600'
+            }`}
+          >
+            {isStartCard ? 'Start Card' : 'Set as Start Card'}
+          </button>
+        )}
         {onDuplicateCard && (
           <button
             onClick={() => onDuplicateCard(card.id)}

@@ -10,6 +10,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { SceneBuilder } from '@/components/editor/SceneBuilder';
 import { updateCard, createAsset, updateAsset } from '@/lib/instantdb/mutations';
 import Link from 'next/link';
+import { getFileUrl } from '@/lib/instantdb/storageUrl';
 import type { AppSchema } from '@/instant/schema';
 import { stripHtml } from '@/lib/utils';
 
@@ -40,19 +41,6 @@ export default function SceneBuilderPage() {
     return map;
   }, [filesData]);
 
-  const isValidInstantDbUrl = (url: string | undefined | null): boolean => {
-    if (!url) return false;
-    return url.includes('instant-storage.s3.amazonaws.com');
-  };
-
-  const getFileUrl = (file: any): string | null => {
-    if (!file) return null;
-    if (file.url && isValidInstantDbUrl(file.url)) return file.url;
-    if (file.src && isValidInstantDbUrl(file.src)) return file.src;
-    if (file.downloadUrl && isValidInstantDbUrl(file.downloadUrl)) return file.downloadUrl;
-    return null;
-  };
-
   // Background images for cards
   // Fall back to card.assetId (old images) if backgroundAssetId is not set
   const backgroundImages = useMemo(() => {
@@ -69,7 +57,7 @@ export default function SceneBuilderPage() {
         const asset = (assets || []).find((a) => a.id === assetId);
         if (asset?.storageKey) {
           const file = fileMap.get(asset.storageKey);
-          const url = getFileUrl(file);
+          const url = getFileUrl(file, asset.storageKey, asset.url);
           if (url) {
             imageMap[card.id] = url;
           }
@@ -86,7 +74,7 @@ export default function SceneBuilderPage() {
       const asset = (assets || []).find((a) => a.id === element.assetId);
       if (asset?.storageKey) {
         const file = fileMap.get(asset.storageKey);
-        const url = getFileUrl(file);
+        const url = getFileUrl(file, asset.storageKey, asset.url);
         if (url) {
           imageMap[element.id] = url;
         }
